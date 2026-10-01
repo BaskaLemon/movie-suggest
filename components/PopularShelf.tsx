@@ -4,7 +4,7 @@ import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { Poster } from "./Poster";
-import type { Movie } from "@/lib/types";
+import { titleHref, type Movie } from "@/lib/types";
 
 // Glass shelf from the hero mock: the focused poster lifts out with a hot outline.
 export function PopularShelf({ movies }: { movies: Movie[] }) {
@@ -25,7 +25,7 @@ export function PopularShelf({ movies }: { movies: Movie[] }) {
             return (
               <Link
                 key={m.id}
-                href={`/movie/${m.id}`}
+                href={titleHref(m)}
                 onMouseEnter={() => setActive(i)}
                 onFocus={() => setActive(i)}
                 className={`relative aspect-[2/3] shrink-0 overflow-hidden rounded-2xl bg-surface-solid transition-all duration-300 ease-out ${

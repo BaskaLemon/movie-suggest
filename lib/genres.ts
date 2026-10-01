@@ -20,7 +20,46 @@ export const GENRES: { id: number; name: string }[] = [
   { id: 37, name: "Western" },
 ];
 
-const byId = new Map(GENRES.map((g) => [g.id, g.name]));
+// TMDB uses a separate genre list for TV. The picker and browse chips stay on the
+// movie list and translate through this map; an empty entry means no TV equivalent.
+const TV_GENRE_MAP: Record<number, number[]> = {
+  28: [10759],
+  12: [10759],
+  16: [16],
+  35: [35],
+  80: [80],
+  99: [99],
+  18: [18],
+  10751: [10751, 10762],
+  14: [10765],
+  36: [10768],
+  27: [9648],
+  10402: [],
+  9648: [9648],
+  10749: [],
+  878: [10765],
+  53: [80, 9648],
+  10752: [10768],
+  37: [37],
+};
+
+export const TV_GENRES = GENRES.filter((g) => TV_GENRE_MAP[g.id]?.length);
+
+export function toTvGenres(ids: number[]): number[] {
+  return [...new Set(ids.flatMap((id) => TV_GENRE_MAP[id] ?? []))];
+}
+
+const byId = new Map<number, string>([
+  ...GENRES.map((g): [number, string] => [g.id, g.name]),
+  [10759, "Action & Adventure"],
+  [10762, "Kids"],
+  [10763, "News"],
+  [10764, "Reality"],
+  [10765, "Sci-Fi & Fantasy"],
+  [10766, "Soap"],
+  [10767, "Talk"],
+  [10768, "War & Politics"],
+]);
 
 export function genreNames(ids: number[], limit = 3): string[] {
   return ids.map((id) => byId.get(id)).filter((n): n is string => Boolean(n)).slice(0, limit);

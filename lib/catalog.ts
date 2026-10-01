@@ -1,6 +1,6 @@
-import { eraRange } from "./genres";
+import { eraRange, toTvGenres } from "./genres";
 import { fallbackDetail, fallbackList, fallbackMatches, fallbackSearch } from "./fallback";
-import type { CastMember, ListKind, Movie, MovieDetail, PickFilters } from "./types";
+import type { CastMember, ListKind, MediaType, Movie, MovieDetail, PickFilters, Season } from "./types";
 
 // Server-only data access. Every call falls back to the bundled catalogue so the
 // site still works without a key or when TMDB is down.
@@ -11,11 +11,14 @@ const ACCESS_TOKEN = process.env.TMDB_ACCESS_TOKEN;
 
 export const hasTmdb = Boolean(API_KEY || ACCESS_TOKEN);
 
-type TmdbMovie = {
+// Movies carry title/release_date; series carry name/first_air_date.
+type TmdbTitle = {
   id: number;
-  title: string;
+  title?: string;
+  name?: string;
   overview: string;
   release_date?: string;
+  first_air_date?: string;
   vote_average: number;
   vote_count: number;
   genre_ids?: number[];
@@ -23,14 +26,22 @@ type TmdbMovie = {
   poster_path: string | null;
   backdrop_path: string | null;
   adult?: boolean;
+  media_type?: string;
 };
 
-type TmdbPage = { page: number; total_pages: number; results: TmdbMovie[] };
+type TmdbPage = { page: number; total_pages: number; total_results: number; results: TmdbTitle[] };
 
-type TmdbDetail = TmdbMovie & {
-  runtime: number | null;
+type TmdbCast = { id: number; name: string; character?: string; profile_path: string | null; roles?: { character: string }[] };
+
+type TmdbDetail = TmdbTitle & {
+  runtime?: number | null;
+  episode_run_time?: number[];
+  number_of_episodes?: number;
+  seasons?: { season_number: number; name: string; episode_count: number; air_date: string | null; poster_path: string | null }[];
+  last_episode_to_air?: { runtime: number | null } | null;
   tagline: string;
-  credits?: { cast: { id: number; name: string; character: string; profile_path: string | null }[] };
+  credits?: { cast: TmdbCast[] };
+  aggregate_credits?: { cast: TmdbCast[] };
   videos?: { results: { key: string; site: string; type: string; official: boolean }[] };
   recommendations?: TmdbPage;
   similar?: TmdbPage;
@@ -50,12 +61,15 @@ async function tmdb<T>(path: string, params: Record<string, string | number | un
   return res.json() as Promise<T>;
 }
 
-function toMovie(m: TmdbMovie): Movie {
+const yearOf = (date?: string | null) => (date ? Number(date.slice(0, 4)) || null : null);
+
+function toMovie(m: TmdbTitle, mediaType: MediaType): Movie {
   return {
     id: m.id,
-    title: m.title,
+    mediaType,
+    title: m.title ?? m.name ?? "Untitled",
     overview: m.overview,
-    year: m.release_date ? Number(m.release_date.slice(0, 4)) || null : null,
+    year: yearOf(m.release_date ?? m.first_air_date),
     rating: Math.round(m.vote_average * 10) / 10,
     voteCount: m.vote_count,
     genreIds: m.genre_ids ?? m.genres?.map((g) => g.id) ?? [],
@@ -64,7 +78,7 @@ function toMovie(m: TmdbMovie): Movie {
   };
 }
 
-const usable = (m: TmdbMovie) => !m.adult && Boolean(m.poster_path);
+const usable = (m: TmdbTitle) => !m.adult && Boolean(m.poster_path);
 
 async function withFallback<T>(live: () => Promise<T>, offline: () => T): Promise<T> {
   if (!hasTmdb) return offline();
@@ -78,47 +92,61 @@ async function withFallback<T>(live: () => Promise<T>, offline: () => T): Promis
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export function getList(kind: ListKind, genre?: number): Promise<Movie[]> {
+// Discover uses different date fields per media type.
+const dateField = (media: MediaType) => (media === "tv" ? "first_air_date" : "primary_release_date");
+
+// `genre` is a movie genre id; series lists translate it to the TV equivalents.
+export function getList(kind: ListKind, genre?: number, media: MediaType = "movie"): Promise<Movie[]> {
   return withFallback(
     async () => {
       let page: TmdbPage;
       if (genre) {
-        const sort = { trending: "popularity.desc", popular: "vote_count.desc", recent: "primary_release_date.desc", top: "vote_average.desc" }[kind];
-        page = await tmdb<TmdbPage>("/discover/movie", {
-          with_genres: genre,
+        const date = dateField(media);
+        const sort = { trending: "popularity.desc", popular: "vote_count.desc", recent: `${date}.desc`, top: "vote_average.desc" }[kind];
+        const genres = media === "tv" ? toTvGenres([genre]) : [genre];
+        if (!genres.length) return [];
+        page = await tmdb<TmdbPage>(`/discover/${media}`, {
+          with_genres: genres.join("|"),
           sort_by: sort,
           include_adult: "false",
-          "vote_count.gte": kind === "top" ? 1000 : kind === "recent" ? 40 : 100,
-          "primary_release_date.lte": today(),
+          "vote_count.gte": kind === "top" ? (media === "tv" ? 300 : 1000) : kind === "recent" ? 40 : 100,
+          [`${date}.lte`]: today(),
         });
       } else {
-        const path = { trending: "/trending/movie/week", popular: "/movie/popular", recent: "/movie/now_playing", top: "/movie/top_rated" }[kind];
-        page = await tmdb<TmdbPage>(path);
+        const paths = {
+          movie: { trending: "/trending/movie/week", popular: "/movie/popular", recent: "/movie/now_playing", top: "/movie/top_rated" },
+          tv: { trending: "/trending/tv/week", popular: "/tv/popular", recent: "/tv/on_the_air", top: "/tv/top_rated" },
+        };
+        page = await tmdb<TmdbPage>(paths[media][kind]);
       }
-      return page.results.filter(usable).map(toMovie);
+      return page.results.filter(usable).map((m) => toMovie(m, media));
     },
-    () => fallbackList(kind, genre),
+    () => fallbackList(kind, genre, media),
   );
 }
 
+// Searches movies and series together; people in the results are dropped.
 export function searchMovies(query: string): Promise<Movie[]> {
   const q = query.trim();
   if (!q) return Promise.resolve([]);
   return withFallback(
     async () => {
-      const page = await tmdb<TmdbPage>("/search/movie", { query: q, include_adult: "false" }, 600);
-      return page.results.filter(usable).map(toMovie);
+      const page = await tmdb<TmdbPage>("/search/multi", { query: q, include_adult: "false" }, 600);
+      return page.results
+        .filter((m) => (m.media_type === "movie" || m.media_type === "tv") && usable(m))
+        .map((m) => toMovie(m, m.media_type as MediaType));
     },
     () => fallbackSearch(q),
   );
 }
 
-export function getMovie(id: number): Promise<MovieDetail | null> {
+export function getTitle(media: MediaType, id: number): Promise<MovieDetail | null> {
   return withFallback(
     async () => {
       let d: TmdbDetail;
       try {
-        d = await tmdb<TmdbDetail>(`/movie/${id}`, { append_to_response: "credits,videos,recommendations,similar" });
+        const credits = media === "tv" ? "aggregate_credits" : "credits";
+        d = await tmdb<TmdbDetail>(`/${media}/${id}`, { append_to_response: `${credits},videos,recommendations,similar` });
       } catch (err) {
         if (err instanceof Error && err.message.endsWith(" 404")) return null;
         throw err;
@@ -126,24 +154,30 @@ export function getMovie(id: number): Promise<MovieDetail | null> {
       const videos = d.videos?.results.filter((v) => v.site === "YouTube") ?? [];
       const trailer =
         videos.find((v) => v.type === "Trailer" && v.official) ?? videos.find((v) => v.type === "Trailer") ?? videos[0];
-      const cast: CastMember[] = (d.credits?.cast ?? []).slice(0, 12).map((c) => ({
+      const castSource = (media === "tv" ? d.aggregate_credits?.cast : d.credits?.cast) ?? [];
+      const cast: CastMember[] = castSource.slice(0, 12).map((c) => ({
         id: c.id,
         name: c.name,
-        character: c.character,
+        character: c.character ?? c.roles?.[0]?.character ?? "",
         photo: c.profile_path,
       }));
       const related = d.recommendations?.results.length ? d.recommendations.results : (d.similar?.results ?? []);
+      const seasons: Season[] = (d.seasons ?? [])
+        .filter((s) => s.season_number > 0)
+        .map((s) => ({ number: s.season_number, name: s.name, episodes: s.episode_count, year: yearOf(s.air_date), poster: s.poster_path }));
       return {
-        ...toMovie(d),
-        runtime: d.runtime,
+        ...toMovie(d, media),
+        runtime: media === "tv" ? (d.episode_run_time?.[0] ?? d.last_episode_to_air?.runtime ?? null) : (d.runtime ?? null),
         tagline: d.tagline,
-        releaseDate: d.release_date || null,
+        releaseDate: (media === "tv" ? d.first_air_date : d.release_date) || null,
         cast,
         trailerKey: trailer?.key ?? null,
-        similar: related.filter(usable).slice(0, 12).map(toMovie),
+        similar: related.filter(usable).slice(0, 12).map((m) => toMovie(m, media)),
+        seasons,
+        episodeCount: d.number_of_episodes ?? null,
       };
     },
-    () => fallbackDetail(id),
+    () => fallbackDetail(media, id),
   );
 }
 
@@ -175,26 +209,33 @@ export function pickMovies(f: PickFilters, count: number): Promise<{ movies: Mov
   return withFallback(
     async () => {
       const { from, to } = eraRange(f.era);
+      const tv = f.media === "tv";
+      const genres = tv ? toTvGenres(f.genres) : f.genres;
+      // Every selected genre lacks a TV equivalent (e.g. only Music): nothing can match.
+      if (f.genres.length && !genres.length) return { movies: [], pool: 0 };
+      const date = dateField(f.media);
       const params = {
-        with_genres: f.genres.join("|"),
+        with_genres: genres.join("|"),
         sort_by: "popularity.desc",
         include_adult: "false",
-        "vote_count.gte": 150,
+        "vote_count.gte": tv ? 100 : 150,
         "vote_average.gte": f.minRating || undefined,
-        "with_runtime.lte": f.maxRuntime ?? undefined,
-        "with_runtime.gte": f.maxRuntime ? 60 : undefined,
-        "primary_release_date.gte": from ? `${from}-01-01` : undefined,
-        "primary_release_date.lte": to ? `${to}-12-31` : today(),
+        // Runtime filters episode length on TV, which isn't what "Length" means, so skip it.
+        "with_runtime.lte": tv ? undefined : (f.maxRuntime ?? undefined),
+        "with_runtime.gte": !tv && f.maxRuntime ? 60 : undefined,
+        [`${date}.gte`]: from ? `${from}-01-01` : undefined,
+        [`${date}.lte`]: to ? `${to}-12-31` : today(),
       };
-      const first = await tmdb<TmdbPage & { total_results: number }>("/discover/movie", params, 3600);
+      const path = `/discover/${f.media}`;
+      const first = await tmdb<TmdbPage>(path, params, 3600);
       // Popularity-sorted pages stay recognisable; cap depth so picks aren't obscure.
       const pages = Math.min(first.total_pages, 15);
       const pageNo = 1 + Math.floor(Math.random() * pages);
-      const page = pageNo === 1 ? first : await tmdb<TmdbPage>("/discover/movie", { ...params, page: pageNo }, 3600);
+      const page = pageNo === 1 ? first : await tmdb<TmdbPage>(path, { ...params, page: pageNo }, 3600);
       const excluded = new Set(f.exclude);
       const fresh = (p: TmdbPage) => shuffle(p.results.filter((m) => usable(m) && !excluded.has(m.id)));
       const picks = takeDistinct(count, fresh(page), fresh(first));
-      return { movies: picks.map(toMovie), pool: first.total_results };
+      return { movies: picks.map((m) => toMovie(m, f.media)), pool: first.total_results };
     },
     () => {
       const all = fallbackMatches(f);

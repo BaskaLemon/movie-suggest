@@ -1,12 +1,13 @@
 "use client";
 
-import { Bookmark, Compass, Dices, Home, Search } from "lucide-react";
+import { Bookmark, Compass, Dices, Home, Search, Tv } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const ITEMS = [
   { href: "/", label: "Home", icon: Home },
   { href: "/#pick", label: "Pick for me", icon: Dices },
+  { href: "/#series", label: "Series", icon: Tv },
   { href: "/#browse", label: "Browse", icon: Compass },
   { href: "/search", label: "Search", icon: Search },
   { href: "/watchlist", label: "Watchlist", icon: Bookmark },

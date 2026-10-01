@@ -5,7 +5,7 @@ import { useRef } from "react";
 import { MovieCard } from "./MovieCard";
 import type { Movie } from "@/lib/types";
 
-export function MovieRow({ title, movies }: { title: string; movies: Movie[] }) {
+export function MovieRow({ id, title, movies }: { id?: string; title: string; movies: Movie[] }) {
   const track = useRef<HTMLDivElement>(null);
   const scroll = (dir: 1 | -1) => {
     const el = track.current;
@@ -13,7 +13,7 @@ export function MovieRow({ title, movies }: { title: string; movies: Movie[] }) 
   };
   if (!movies.length) return null;
   return (
-    <section aria-label={title} className="relative">
+    <section id={id} aria-label={title} className="relative scroll-mt-20">
       <div className="mb-5 flex items-end justify-between px-4 sm:px-8">
         <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">{title}</h2>
         <div className="hidden gap-2 sm:flex">
@@ -27,7 +27,7 @@ export function MovieRow({ title, movies }: { title: string; movies: Movie[] }) 
       </div>
       <div ref={track} className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-4 px-4 pb-4 sm:scroll-px-8 sm:gap-5 sm:px-8">
         {movies.map((m) => (
-          <div key={m.id} className="w-[42vw] shrink-0 snap-start sm:w-44 lg:w-52">
+          <div key={`${m.mediaType}-${m.id}`} className="w-[42vw] shrink-0 snap-start sm:w-44 lg:w-52">
             <MovieCard movie={m} />
           </div>
         ))}

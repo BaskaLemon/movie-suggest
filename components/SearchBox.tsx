@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { Poster } from "./Poster";
-import type { Movie } from "@/lib/types";
+import { titleHref, type Movie } from "@/lib/types";
 
 export function SearchBox({ className = "" }: { className?: string }) {
   const router = useRouter();
@@ -51,7 +51,7 @@ export function SearchBox({ className = "" }: { className?: string }) {
     const q = query.trim();
     if (!q) return;
     setOpen(false);
-    router.push(active >= 0 && results[active] ? `/movie/${results[active].id}` : `/search?q=${encodeURIComponent(q)}`);
+    router.push(active >= 0 && results[active] ? titleHref(results[active]) : `/search?q=${encodeURIComponent(q)}`);
   }
 
   return (
@@ -80,8 +80,8 @@ export function SearchBox({ className = "" }: { className?: string }) {
               setActive((i) => Math.max(i - 1, -1));
             }
           }}
-          placeholder="Search movies or actors"
-          aria-label="Search movies"
+          placeholder="Search movies, series, actors"
+          aria-label="Search movies and series"
           role="combobox"
           aria-expanded={visible}
           aria-controls={listId}
@@ -103,11 +103,11 @@ export function SearchBox({ className = "" }: { className?: string }) {
             <>
               {results.map((m, i) => (
                 <Link
-                  key={m.id}
+                  key={`${m.mediaType}-${m.id}`}
                   id={`${listId}-${i}`}
                   role="option"
                   aria-selected={i === active}
-                  href={`/movie/${m.id}`}
+                  href={titleHref(m)}
                   onClick={() => setOpen(false)}
                   className={`flex items-center gap-3 rounded-xl p-2 transition ${i === active ? "bg-white/10" : "hover:bg-white/5"}`}
                 >
@@ -117,6 +117,7 @@ export function SearchBox({ className = "" }: { className?: string }) {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{m.title}</p>
                     <p className="text-xs text-muted">
+                      {m.mediaType === "tv" ? "Series · " : ""}
                       {m.year ?? "TBA"} {m.rating ? `· ★ ${m.rating.toFixed(1)}` : ""}
                     </p>
                   </div>

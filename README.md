@@ -1,6 +1,6 @@
 # Reelpick
 
-A movie suggestion site. Pick a mood, genres, era, length and minimum rating, and it rolls one movie for tonight. Reroll and it won't repeat itself. Also: a cinematic trending hero, browse tabs by list and genre, live search, movie detail pages (ratings gauge, cast, trailer, similar titles) and a watchlist saved in the browser.
+A movie and TV series suggestion site. Pick movies or series, a mood, genres, era, length and minimum rating, and it rolls one movie for tonight. Reroll and it won't repeat itself. Also: a cinematic trending hero, browse tabs by list and genre, live search, movie detail pages (ratings gauge, cast, trailer, similar titles) and a watchlist saved in the browser.
 
 Built with Next.js 16 (App Router), Tailwind CSS 4, Motion and lucide icons. Data from [TMDB](https://www.themoviedb.org/).
 
@@ -14,7 +14,7 @@ bun dev
 
 Get a free key at <https://www.themoviedb.org/settings/api>. Either `TMDB_API_KEY` (v3 key) or `TMDB_ACCESS_TOKEN` (v4 read token) works.
 
-Without a key the site runs on a bundled demo catalogue of ~48 films with generated poster art, so everything still works offline. A footer badge shows when demo data is in use.
+Without a key the site runs on a bundled demo catalogue of 48 films and 22 series with generated poster art, so everything still works offline. A footer badge shows when demo data is in use.
 
 ## Where things live
 

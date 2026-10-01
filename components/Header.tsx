@@ -10,6 +10,7 @@ import { useWatchlist } from "@/lib/watchlist";
 const NAV = [
   { href: "/", label: "Home" },
   { href: "/#pick", label: "Pick for me" },
+  { href: "/#series", label: "Series" },
   { href: "/#browse", label: "Browse" },
   { href: "/watchlist", label: "Watchlist" },
 ];

@@ -20,7 +20,7 @@ const display = Bebas_Neue({
 
 export const metadata: Metadata = {
   title: { default: "Reelpick: what should I watch tonight?", template: "%s · Reelpick" },
-  description: "Pick a mood, a genre and an era, and get one movie to watch tonight.",
+  description: "Pick a mood, a genre and an era, and get a shortlist of movies or series to watch tonight.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

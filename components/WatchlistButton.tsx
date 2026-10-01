@@ -6,13 +6,13 @@ import type { Movie } from "@/lib/types";
 
 // Store only the summary fields so detail payloads (cast, similar) don't bloat localStorage.
 function summary(m: Movie): Movie {
-  const { id, title, overview, year, rating, voteCount, genreIds, poster, backdrop } = m;
-  return { id, title, overview, year, rating, voteCount, genreIds, poster, backdrop };
+  const { id, mediaType, title, overview, year, rating, voteCount, genreIds, poster, backdrop } = m;
+  return { id, mediaType, title, overview, year, rating, voteCount, genreIds, poster, backdrop };
 }
 
 export function WatchlistButton({ movie, compact = false, className = "" }: { movie: Movie; compact?: boolean; className?: string }) {
   const { has, toggle } = useWatchlist();
-  const saved = has(movie.id);
+  const saved = has(movie.mediaType, movie.id);
   return (
     <button
       type="button"

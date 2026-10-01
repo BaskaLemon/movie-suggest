@@ -4,11 +4,12 @@ import { ArrowRight, Brain, Dices, Ghost, Heart, Laugh, RotateCcw, Sun, Swords, 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useState } from "react";
+import { MediaToggle } from "./MediaToggle";
 import { Poster } from "./Poster";
 import { RatingBadge } from "./RatingBadge";
 import { WatchlistButton } from "./WatchlistButton";
-import { ERAS, GENRES, MOODS, RUNTIMES, genreNames } from "@/lib/genres";
-import type { Movie } from "@/lib/types";
+import { ERAS, GENRES, MOODS, RUNTIMES, TV_GENRES, genreNames } from "@/lib/genres";
+import { titleHref, type MediaType, type Movie } from "@/lib/types";
 
 const MOOD_ICONS: Record<string, typeof Zap> = {
   adrenaline: Zap,
@@ -47,6 +48,7 @@ function Label({ children }: { children: React.ReactNode }) {
 
 export function Picker() {
   const reduce = useReducedMotion();
+  const [media, setMedia] = useState<MediaType>("movie");
   const [genres, setGenres] = useState<number[]>([]);
   const [era, setEra] = useState("any");
   const [minRating, setMinRating] = useState(6.5);
@@ -55,10 +57,22 @@ export function Picker() {
   const [count, setCount] = useState(5);
   const [picks, setPicks] = useState<Movie[]>([]);
   const [active, setActive] = useState(0);
-  const [seen, setSeen] = useState<number[]>([]);
+  // Ids are only unique per media type, so remember what we've shown separately.
+  const [seen, setSeen] = useState<Record<MediaType, number[]>>({ movie: [], tv: [] });
   const [pool, setPool] = useState(0);
 
   const featured = picks[active] ?? null;
+  const tv = media === "tv";
+  const noun = tv ? "series" : "movie";
+
+  const switchMedia = (next: MediaType) => {
+    if (next === media) return;
+    setMedia(next);
+    // Drop genres with no TV equivalent so the chip count matches what's sent.
+    if (next === "tv") setGenres((g) => g.filter((id) => TV_GENRES.some((t) => t.id === id)));
+    setPicks([]);
+    setStatus("idle");
+  };
 
   const toggleGenre = (id: number) => setGenres((g) => (g.includes(id) ? g.filter((x) => x !== id) : [...g, id]));
   const reset = () => {
@@ -71,12 +85,13 @@ export function Picker() {
   async function pick() {
     setStatus("loading");
     const params = new URLSearchParams({
+      media,
       genres: genres.join(","),
       era,
       minRating: String(minRating),
-      maxRuntime: String(maxRuntime ?? 0),
+      maxRuntime: String(tv ? 0 : (maxRuntime ?? 0)),
       count: String(count),
-      exclude: seen.slice(-80).join(","),
+      exclude: seen[media].slice(-80).join(","),
     });
     try {
       // Hold the shuffle for a beat so the reveal reads as a reveal, not a flicker.
@@ -90,7 +105,7 @@ export function Picker() {
       }
       setPicks(data.movies);
       setActive(0);
-      setSeen((s) => [...s, ...data.movies.map((m) => m.id)]);
+      setSeen((s) => ({ ...s, [media]: [...s[media], ...data.movies.map((m) => m.id)] }));
       setStatus("done");
     } catch {
       setStatus("error");
@@ -102,13 +117,16 @@ export function Picker() {
       <div className="mb-8 max-w-2xl">
         <p className="text-xs font-medium uppercase tracking-[0.3em] text-accent">Can’t decide?</p>
         <h2 id="pick-heading" className="mt-2 font-display text-5xl leading-none tracking-wide sm:text-6xl">
-          Let us pick tonight’s movie
+          Let us pick tonight’s {noun}
         </h2>
         <p className="mt-3 text-ink/70">Set a mood, narrow it down if you like, and roll for a shortlist. Don’t like any of them? Roll again, we won’t repeat ourselves.</p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
         <div className="glass rounded-3xl p-6 sm:p-7">
+          <div className="mb-7">
+            <MediaToggle value={media} onChange={switchMedia} layoutGroup="picker" />
+          </div>
           <Label>Mood</Label>
           <div className="flex flex-wrap gap-2">
             {MOODS.map((m) => {
@@ -126,7 +144,7 @@ export function Picker() {
           <div className="mt-7">
             <Label>Genres {genres.length > 0 && <span className="normal-case tracking-normal">· any of {genres.length}</span>}</Label>
             <div className="flex flex-wrap gap-2">
-              {GENRES.map((g) => (
+              {(tv ? TV_GENRES : GENRES).map((g) => (
                 <Chip key={g.id} on={genres.includes(g.id)} onClick={() => toggleGenre(g.id)}>
                   {g.name}
                 </Chip>
@@ -145,16 +163,18 @@ export function Picker() {
             </div>
           </div>
 
-          <div className="mt-7">
-            <Label>Length</Label>
-            <div className="flex flex-wrap gap-2">
-              {RUNTIMES.map((r) => (
-                <Chip key={r.label} on={maxRuntime === r.value} onClick={() => setMaxRuntime(r.value)}>
-                  {r.label}
-                </Chip>
-              ))}
+          {!tv && (
+            <div className="mt-7">
+              <Label>Length</Label>
+              <div className="flex flex-wrap gap-2">
+                {RUNTIMES.map((r) => (
+                  <Chip key={r.label} on={maxRuntime === r.value} onClick={() => setMaxRuntime(r.value)}>
+                    {r.label}
+                  </Chip>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="mt-7">
             <div className="flex items-baseline justify-between">
@@ -178,7 +198,7 @@ export function Picker() {
             <div className="flex flex-wrap gap-2">
               {COUNTS.map((n) => (
                 <Chip key={n} on={count === n} onClick={() => setCount(n)}>
-                  {n === 1 ? "Just one" : `${n} movies`}
+                  {n === 1 ? "Just one" : `${n} ${tv ? "series" : "movies"}`}
                 </Chip>
               ))}
             </div>
@@ -241,7 +261,7 @@ export function Picker() {
                         <p className="mt-4 line-clamp-3 max-w-xl text-[15px] leading-relaxed text-ink/85">{featured.overview}</p>
                         <div className="mt-6 flex flex-wrap gap-3">
                           <Link
-                            href={`/movie/${featured.id}`}
+                            href={titleHref(featured)}
                             className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-6 text-sm font-semibold text-[#070a1c] transition hover:bg-white/90"
                           >
                             Details & trailer
@@ -321,7 +341,7 @@ export function Picker() {
                   {status === "loading" && <p className="text-lg font-medium">Shuffling the reels…</p>}
                   {status === "idle" && (
                     <>
-                      <p className="text-lg font-medium">Your next movie is one click away</p>
+                      <p className="text-lg font-medium">Your next {noun} is one click away</p>
                       <p className="mt-1 text-sm text-muted">Leave everything blank for a total surprise.</p>
                     </>
                   )}

@@ -17,11 +17,11 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
     <div className="px-4 pt-28 sm:px-8">
       <h1 className="font-display text-6xl tracking-wide sm:text-7xl">{q ? `Results for “${q}”` : "Search"}</h1>
       <SearchBox className="mt-6 max-w-xl md:hidden" />
-      {q && <p className="mt-2 text-muted">{results.length ? `${results.length} movies found` : "No movies matched. Try a shorter title or an actor’s name."}</p>}
-      {!q && <p className="mt-2 text-muted">Find a movie by title or cast.</p>}
+      {q && <p className="mt-2 text-muted">{results.length ? `${results.length} ${results.length === 1 ? "title" : "titles"} found` : "Nothing matched. Try a shorter title or an actor’s name."}</p>}
+      {!q && <p className="mt-2 text-muted">Find a movie or series by title or cast.</p>}
       <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
         {results.map((m) => (
-          <MovieCard key={m.id} movie={m} />
+          <MovieCard key={`${m.mediaType}-${m.id}`} movie={m} />
         ))}
       </div>
     </div>

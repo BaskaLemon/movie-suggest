@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
   const list = q.get("list") as ListKind;
   const genre = Number(q.get("genre") ?? 0);
   if (!KINDS.includes(list)) return Response.json({ error: "Unknown list" }, { status: 400 });
-  const movies = await getList(list, genre > 0 ? genre : undefined);
+  const media = q.get("media") === "tv" ? "tv" : "movie";
+  const movies = await getList(list, genre > 0 ? genre : undefined, media);
   return Response.json({ movies });
 }

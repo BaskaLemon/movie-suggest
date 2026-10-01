@@ -8,7 +8,7 @@ import { Poster } from "./Poster";
 import { Stars } from "./Stars";
 import { WatchlistButton } from "./WatchlistButton";
 import { genreNames } from "@/lib/genres";
-import type { Movie } from "@/lib/types";
+import { titleHref, type Movie } from "@/lib/types";
 
 function splitTitle(title: string): [string, string | null] {
   const i = title.indexOf(":");
@@ -81,7 +81,7 @@ export function HeroCarousel({ movies }: { movies: Movie[] }) {
             </div>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
-                href={`/movie/${movie.id}`}
+                href={titleHref(movie)}
                 className="inline-flex h-12 items-center gap-2.5 rounded-full bg-accent px-7 text-sm font-semibold text-accent-ink shadow-[0_10px_30px_-8px_rgba(25,181,254,0.7)] transition hover:brightness-110 active:scale-[0.97]"
               >
                 <Play size={18} className="fill-current" />

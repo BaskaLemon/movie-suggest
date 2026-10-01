@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useSyncExternalStore } from "react";
-import type { Movie } from "./types";
+import type { MediaType, Movie } from "./types";
 
 const KEY = "reelpick:watchlist";
 const EMPTY: Movie[] = [];
@@ -12,7 +12,8 @@ function read(): Movie[] {
   if (cache) return cache;
   try {
     const parsed = JSON.parse(localStorage.getItem(KEY) ?? "[]");
-    cache = Array.isArray(parsed) ? parsed : [];
+    // Entries saved before series existed have no mediaType; they are all movies.
+    cache = Array.isArray(parsed) ? parsed.map((m: Movie) => ({ ...m, mediaType: m.mediaType ?? "movie" })) : [];
   } catch {
     cache = [];
   }
@@ -43,13 +44,17 @@ function subscribe(listener: () => void) {
   };
 }
 
+// Movie and series ids overlap on TMDB, so entries are keyed on both.
+const same = (m: Movie, mediaType: MediaType, id: number) => m.mediaType === mediaType && m.id === id;
+
 export function useWatchlist() {
   const list = useSyncExternalStore(subscribe, read, () => EMPTY);
-  const has = useCallback((id: number) => list.some((m) => m.id === id), [list]);
+  const has = useCallback((mediaType: MediaType, id: number) => list.some((m) => same(m, mediaType, id)), [list]);
   const toggle = useCallback((movie: Movie) => {
     const current = read();
-    write(current.some((m) => m.id === movie.id) ? current.filter((m) => m.id !== movie.id) : [movie, ...current]);
+    const saved = current.some((m) => same(m, movie.mediaType, movie.id));
+    write(saved ? current.filter((m) => !same(m, movie.mediaType, movie.id)) : [movie, ...current]);
   }, []);
-  const remove = useCallback((id: number) => write(read().filter((m) => m.id !== id)), []);
+  const remove = useCallback((mediaType: MediaType, id: number) => write(read().filter((m) => !same(m, mediaType, id))), []);
   return { list, has, toggle, remove };
 }
