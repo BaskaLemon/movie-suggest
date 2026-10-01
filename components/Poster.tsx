@@ -53,7 +53,7 @@ export function Poster({ movie, variant = "poster", sizes, priority, className =
         style={{ background: `radial-gradient(circle at 35% 35%, ${c}, transparent 70%)` }}
       />
       {variant === "poster" && (
-        <div className="relative">
+        <div className="relative @max-[100px]:hidden">
           <p className="font-display text-[clamp(1rem,16cqi,3rem)] leading-[0.95] tracking-wide text-white drop-shadow-lg [overflow-wrap:anywhere]">
             {movie.title}
           </p>
