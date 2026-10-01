@@ -147,11 +147,31 @@ export function getMovie(id: number): Promise<MovieDetail | null> {
   );
 }
 
-function randomItem<T>(items: T[]): T | null {
-  return items.length ? items[Math.floor(Math.random() * items.length)] : null;
+function shuffle<T>(items: T[]): T[] {
+  const a = [...items];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
 
-export function pickMovie(f: PickFilters): Promise<{ movie: Movie | null; pool: number }> {
+// Fill up to `count` from each source in order, skipping duplicates.
+function takeDistinct<T extends { id: number }>(count: number, ...sources: T[][]): T[] {
+  const out: T[] = [];
+  const ids = new Set<number>();
+  for (const source of sources) {
+    for (const item of source) {
+      if (out.length === count) return out;
+      if (ids.has(item.id)) continue;
+      ids.add(item.id);
+      out.push(item);
+    }
+  }
+  return out;
+}
+
+export function pickMovies(f: PickFilters, count: number): Promise<{ movies: Movie[]; pool: number }> {
   return withFallback(
     async () => {
       const { from, to } = eraRange(f.era);
@@ -172,15 +192,20 @@ export function pickMovie(f: PickFilters): Promise<{ movie: Movie | null; pool: 
       const pageNo = 1 + Math.floor(Math.random() * pages);
       const page = pageNo === 1 ? first : await tmdb<TmdbPage>("/discover/movie", { ...params, page: pageNo }, 3600);
       const excluded = new Set(f.exclude);
-      const fresh = (p: TmdbPage) => p.results.filter((m) => usable(m) && !excluded.has(m.id));
-      const pick = randomItem(fresh(page)) ?? randomItem(fresh(first));
-      return { movie: pick ? toMovie(pick) : null, pool: first.total_results };
+      const fresh = (p: TmdbPage) => shuffle(p.results.filter((m) => usable(m) && !excluded.has(m.id)));
+      const picks = takeDistinct(count, fresh(page), fresh(first));
+      return { movies: picks.map(toMovie), pool: first.total_results };
     },
     () => {
       const all = fallbackMatches(f);
       const excluded = new Set(f.exclude);
-      const pick = randomItem(all.filter((m) => !excluded.has(m.id))) ?? randomItem(all);
-      return { movie: pick, pool: all.length };
+      // The demo catalogue is small, so top up with already-seen titles rather than return a short list.
+      const picks = takeDistinct(
+        count,
+        shuffle(all.filter((m) => !excluded.has(m.id))),
+        shuffle(all.filter((m) => excluded.has(m.id))),
+      );
+      return { movies: picks, pool: all.length };
     },
   );
 }

@@ -22,6 +22,8 @@ const MOOD_ICONS: Record<string, typeof Zap> = {
 
 type Status = "idle" | "loading" | "done" | "empty" | "error";
 
+const COUNTS = [1, 3, 5, 8];
+
 const sameSet = (a: readonly number[], b: readonly number[]) => a.length === b.length && a.every((x) => b.includes(x));
 
 function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -50,9 +52,13 @@ export function Picker() {
   const [minRating, setMinRating] = useState(6.5);
   const [maxRuntime, setMaxRuntime] = useState<number | null>(null);
   const [status, setStatus] = useState<Status>("idle");
-  const [movie, setMovie] = useState<Movie | null>(null);
+  const [count, setCount] = useState(5);
+  const [picks, setPicks] = useState<Movie[]>([]);
+  const [active, setActive] = useState(0);
   const [seen, setSeen] = useState<number[]>([]);
   const [pool, setPool] = useState(0);
+
+  const featured = picks[active] ?? null;
 
   const toggleGenre = (id: number) => setGenres((g) => (g.includes(id) ? g.filter((x) => x !== id) : [...g, id]));
   const reset = () => {
@@ -69,20 +75,22 @@ export function Picker() {
       era,
       minRating: String(minRating),
       maxRuntime: String(maxRuntime ?? 0),
-      exclude: seen.slice(-60).join(","),
+      count: String(count),
+      exclude: seen.slice(-80).join(","),
     });
     try {
       // Hold the shuffle for a beat so the reveal reads as a reveal, not a flicker.
       const [res] = await Promise.all([fetch(`/api/pick?${params}`), new Promise((r) => setTimeout(r, reduce ? 0 : 900))]);
       if (!res.ok) throw new Error(String(res.status));
-      const data: { movie: Movie | null; pool: number } = await res.json();
+      const data: { movies: Movie[]; pool: number } = await res.json();
       setPool(data.pool);
-      if (!data.movie) {
+      if (!data.movies.length) {
         setStatus("empty");
         return;
       }
-      setMovie(data.movie);
-      setSeen((s) => [...s, data.movie!.id]);
+      setPicks(data.movies);
+      setActive(0);
+      setSeen((s) => [...s, ...data.movies.map((m) => m.id)]);
       setStatus("done");
     } catch {
       setStatus("error");
@@ -96,7 +104,7 @@ export function Picker() {
         <h2 id="pick-heading" className="mt-2 font-display text-5xl leading-none tracking-wide sm:text-6xl">
           Let us pick tonight’s movie
         </h2>
-        <p className="mt-3 text-ink/70">Set a mood, narrow it down if you like, and roll. Don’t like the pick? Roll again, we won’t repeat ourselves.</p>
+        <p className="mt-3 text-ink/70">Set a mood, narrow it down if you like, and roll for a shortlist. Don’t like any of them? Roll again, we won’t repeat ourselves.</p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
@@ -165,6 +173,17 @@ export function Picker() {
             />
           </div>
 
+          <div className="mt-7">
+            <Label>Suggestions per roll</Label>
+            <div className="flex flex-wrap gap-2">
+              {COUNTS.map((n) => (
+                <Chip key={n} on={count === n} onClick={() => setCount(n)}>
+                  {n === 1 ? "Just one" : `${n} movies`}
+                </Chip>
+              ))}
+            </div>
+          </div>
+
           <div className="mt-8 flex items-center gap-3">
             <button
               type="button"
@@ -173,7 +192,7 @@ export function Picker() {
               className="shimmer inline-flex h-14 flex-1 items-center justify-center gap-2.5 rounded-full bg-accent text-base font-semibold text-accent-ink shadow-[0_14px_40px_-10px_rgba(25,181,254,0.8)] transition hover:brightness-110 active:scale-[0.98] disabled:opacity-70"
             >
               <Dices size={20} className={status === "loading" ? "animate-spin" : ""} />
-              {status === "done" ? "Pick another" : "Pick for me"}
+              {status === "done" ? (count > 1 ? "Roll new picks" : "Pick another") : "Pick for me"}
             </button>
             <button type="button" onClick={reset} aria-label="Reset filters" title="Reset filters" className="grid size-14 place-items-center rounded-full border border-line text-ink/70 hover:bg-white/5 hover:text-ink">
               <RotateCcw size={18} />
@@ -181,49 +200,97 @@ export function Picker() {
           </div>
         </div>
 
-        <div className="glass relative min-h-[700px] sm:min-h-[540px] overflow-hidden rounded-3xl" aria-live="polite">
+        <div className="glass relative min-h-[820px] sm:min-h-[660px] overflow-hidden rounded-3xl" aria-live="polite">
           <AnimatePresence mode="wait">
-            {status === "done" && movie ? (
-              <motion.article
-                key={movie.id}
-                initial={reduce ? false : { opacity: 0, rotateY: -25, scale: 0.94 }}
-                animate={{ opacity: 1, rotateY: 0, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.97 }}
-                transition={{ type: "spring", stiffness: 140, damping: 20 }}
-                style={{ transformPerspective: 1200 }}
-                className="absolute inset-0"
+            {status === "done" && featured ? (
+              <motion.div
+                key="results"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 flex flex-col"
               >
-                <div className="absolute inset-0">
-                  <Poster movie={movie} variant="backdrop" sizes="(max-width: 1024px) 100vw, 60vw" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#070a1c] via-[#070a1c]/85 to-[#070a1c]/30" />
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#070a1c]/90 to-transparent" />
-                </div>
-                <div className="relative flex h-full flex-col justify-end gap-6 p-6 sm:flex-row sm:items-end sm:p-9">
-                  <div className="relative aspect-[2/3] w-36 shrink-0 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/15 sm:w-48">
-                    <Poster movie={movie} sizes="200px" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium uppercase tracking-[0.25em] text-accent">Your pick</p>
-                    <h3 className="mt-2 text-3xl font-semibold leading-tight sm:text-4xl">{movie.title}</h3>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink/70">
-                      <RatingBadge rating={movie.rating} />
-                      <span>{[movie.year, ...genreNames(movie.genreIds)].filter(Boolean).join(" · ")}</span>
+                <AnimatePresence mode="wait">
+                  <motion.article
+                    key={featured.id}
+                    initial={reduce ? false : { opacity: 0, rotateY: -25, scale: 0.94 }}
+                    animate={{ opacity: 1, rotateY: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.97 }}
+                    transition={{ type: "spring", stiffness: 140, damping: 20 }}
+                    style={{ transformPerspective: 1200 }}
+                    className="relative min-h-0 flex-1"
+                  >
+                    <div className="absolute inset-0">
+                      <Poster movie={featured} variant="backdrop" sizes="(max-width: 1024px) 100vw, 60vw" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#070a1c] via-[#070a1c]/85 to-[#070a1c]/30" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-[#070a1c]/90 to-transparent" />
                     </div>
-                    <p className="mt-4 line-clamp-4 max-w-xl text-[15px] leading-relaxed text-ink/85">{movie.overview}</p>
-                    <div className="mt-6 flex flex-wrap gap-3">
-                      <Link
-                        href={`/movie/${movie.id}`}
-                        className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-6 text-sm font-semibold text-[#070a1c] transition hover:bg-white/90"
-                      >
-                        Details & trailer
-                        <ArrowRight size={17} />
-                      </Link>
-                      <WatchlistButton movie={movie} />
+                    <div className="relative flex h-full flex-col justify-end gap-6 p-6 sm:flex-row sm:items-end sm:p-9">
+                      <div className="relative aspect-[2/3] w-36 shrink-0 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/15 sm:w-48">
+                        <Poster movie={featured} sizes="200px" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium uppercase tracking-[0.25em] text-accent">
+                          {picks.length > 1 ? `Pick ${active + 1} of ${picks.length}` : "Your pick"}
+                        </p>
+                        <h3 className="mt-2 text-3xl font-semibold leading-tight sm:text-4xl">{featured.title}</h3>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink/70">
+                          <RatingBadge rating={featured.rating} />
+                          <span>{[featured.year, ...genreNames(featured.genreIds)].filter(Boolean).join(" · ")}</span>
+                        </div>
+                        <p className="mt-4 line-clamp-3 max-w-xl text-[15px] leading-relaxed text-ink/85">{featured.overview}</p>
+                        <div className="mt-6 flex flex-wrap gap-3">
+                          <Link
+                            href={`/movie/${featured.id}`}
+                            className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-6 text-sm font-semibold text-[#070a1c] transition hover:bg-white/90"
+                          >
+                            Details & trailer
+                            <ArrowRight size={17} />
+                          </Link>
+                          <WatchlistButton movie={featured} />
+                        </div>
+                        <p className="mt-4 text-xs text-muted">Picked from {pool.toLocaleString()} matches.</p>
+                      </div>
                     </div>
-                    <p className="mt-4 text-xs text-muted">Picked from {pool.toLocaleString()} matches.</p>
+                  </motion.article>
+                </AnimatePresence>
+
+                {picks.length > 1 && (
+                  <div className="relative border-t border-line bg-[#070a1c]/85 px-4 py-4 backdrop-blur sm:px-6">
+                    <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-muted">All {picks.length} picks</p>
+                    <div role="tablist" aria-label="Suggested movies" className="no-scrollbar -m-1 flex gap-3 overflow-x-auto p-1">
+                      {picks.map((m, i) => {
+                        const on = i === active;
+                        return (
+                          <motion.button
+                            key={m.id}
+                            type="button"
+                            role="tab"
+                            aria-selected={on}
+                            onClick={() => setActive(i)}
+                            initial={reduce ? false : { opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.15 + i * 0.06 }}
+                            className={`flex w-52 shrink-0 items-center gap-3 rounded-xl p-2 text-left transition ${
+                              on ? "bg-white/10 ring-2 ring-hot/70" : "hover:bg-white/5"
+                            }`}
+                          >
+                            <span className="relative aspect-[2/3] w-11 shrink-0 overflow-hidden rounded-md bg-surface-solid">
+                              <Poster movie={m} sizes="44px" />
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-medium">{m.title}</span>
+                              <span className="block text-xs text-muted">
+                                {m.year ?? "TBA"} {m.rating ? `· ★ ${m.rating.toFixed(1)}` : ""}
+                              </span>
+                            </span>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              </motion.article>
+                )}
+              </motion.div>
             ) : (
               <motion.div
                 key={status}
