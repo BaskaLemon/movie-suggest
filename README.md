@@ -1,6 +1,6 @@
 # Reelpick
 
-A movie and TV series suggestion site. Pick movies or series, a mood, genres, era, length and minimum rating, and it rolls one movie for tonight. Reroll and it won't repeat itself. Also: a cinematic trending hero, browse tabs by list and genre, live search, movie detail pages (ratings gauge, cast, trailer, similar titles) and a watchlist saved in the browser.
+A movie and TV series suggestion site. Choose movies or series, a mood, genres, era, length and minimum rating, and it rolls a shortlist for tonight. Reroll and it won't repeat itself. Also: a cinematic trending hero, browse tabs by list and genre, live search across movies and series, detail pages (ratings gauge, cast, trailer, seasons, similar titles) and a watchlist saved in the browser.
 
 Built with Next.js 16 (App Router), Tailwind CSS 4, Motion and lucide icons. Data from [TMDB](https://www.themoviedb.org/).
 
