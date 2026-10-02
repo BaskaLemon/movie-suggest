@@ -31,6 +31,15 @@ You don't need a database URL to run locally: the default is the file `prisma/de
 
 Signed-in profiles keep their watchlist in the database, so it follows the account across browsers. Signed-out visitors keep a list in browser storage; it moves into the profile the first time they sign in.
 
+## Deploying to Vercel
+
+Set these in Vercel → Project → Settings → Environment Variables, then redeploy:
+
+- `DATABASE_URL`: your Turso URL (`libsql://<db>-<org>.turso.io?authToken=<token>`). Required: Vercel's filesystem can't hold a SQLite file, so the build stops with an explanation if this is missing.
+- `TMDB_API_KEY` (or `TMDB_ACCESS_TOKEN`): without it the site shows the demo catalogue.
+
+`build` applies pending migrations to the database before `next build`, so schema changes reach Turso on each deploy. Posters load straight from TMDB's CDN (`images.unoptimized`), so they don't count against Vercel's image optimisation quota.
+
 ## Where things live
 
 - `lib/catalog.ts` – all TMDB calls (server only), each with an automatic fallback to `lib/fallback.ts`

@@ -1,4 +1,4 @@
-// Applies pending migrations before the app starts.
+// Applies pending migrations before the app starts (and before `build`, which is what Vercel runs).
 //
 // Local SQLite files go through `prisma migrate deploy`. Prisma's migration engine doesn't
 // accept libsql:// (Turso) URLs, so for those this applies prisma/migrations/*/migration.sql
@@ -10,6 +10,17 @@ import { createHash, randomUUID } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { databaseUrl, isLocalFile } from "./env.mjs";
+
+// On Vercel the filesystem is read-only and reset per request, so a SQLite file can't hold
+// accounts. Fail the build with the fix instead of deploying a site whose sign-in is broken.
+if (isLocalFile && process.env.VERCEL) {
+  console.error(
+    "DATABASE_URL is not set for this Vercel deployment, so the app would fall back to a local SQLite file, " +
+      "which can't work on Vercel.\nAdd your Turso URL as DATABASE_URL in Vercel → Project → Settings → " +
+      "Environment Variables, then redeploy.",
+  );
+  process.exit(1);
+}
 
 if (isLocalFile) {
   const cli = path.join(process.cwd(), "node_modules", "prisma", "build", "index.js");
