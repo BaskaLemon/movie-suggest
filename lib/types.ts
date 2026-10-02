@@ -1,4 +1,6 @@
 export type MediaType = "movie" | "tv";
+// The picker can also roll across both.
+export type PickMedia = MediaType | "all";
 
 // A movie or a TV series. TMDB ids are only unique within a media type.
 export type Movie = {

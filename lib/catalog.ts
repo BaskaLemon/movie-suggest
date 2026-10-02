@@ -250,3 +250,23 @@ export function pickMovies(f: PickFilters, count: number): Promise<{ movies: Mov
     },
   );
 }
+
+// Rolls movies and series separately, then interleaves them so a shortlist mixes both.
+// Each side asks for the full count so one side can fill in when the other runs short.
+export async function pickMixed(
+  f: Omit<PickFilters, "media" | "exclude">,
+  exclude: Record<MediaType, number[]>,
+  count: number,
+): Promise<{ movies: Movie[]; pool: number }> {
+  const [movies, series] = await Promise.all([
+    pickMovies({ ...f, media: "movie", exclude: exclude.movie }, count),
+    pickMovies({ ...f, media: "tv", exclude: exclude.tv }, count),
+  ]);
+  const [first, second] = Math.random() < 0.5 ? [movies.movies, series.movies] : [series.movies, movies.movies];
+  const mixed: Movie[] = [];
+  for (let i = 0; mixed.length < count && (i < first.length || i < second.length); i++) {
+    if (i < first.length) mixed.push(first[i]);
+    if (i < second.length && mixed.length < count) mixed.push(second[i]);
+  }
+  return { movies: mixed, pool: movies.pool + series.pool };
+}

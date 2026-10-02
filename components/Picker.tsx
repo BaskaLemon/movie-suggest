@@ -9,7 +9,7 @@ import { Poster } from "./Poster";
 import { RatingBadge } from "./RatingBadge";
 import { WatchlistButton } from "./WatchlistButton";
 import { ERAS, GENRES, MOODS, RUNTIMES, TV_GENRES, genreNames } from "@/lib/genres";
-import { titleHref, type MediaType, type Movie } from "@/lib/types";
+import { titleHref, type MediaType, type Movie, type PickMedia } from "@/lib/types";
 
 const MOOD_ICONS: Record<string, typeof Zap> = {
   adrenaline: Zap,
@@ -48,7 +48,7 @@ function Label({ children }: { children: React.ReactNode }) {
 
 export function Picker() {
   const reduce = useReducedMotion();
-  const [media, setMedia] = useState<MediaType>("movie");
+  const [media, setMedia] = useState<PickMedia>("all");
   const [genres, setGenres] = useState<number[]>([]);
   const [era, setEra] = useState("any");
   const [minRating, setMinRating] = useState(6.5);
@@ -63,9 +63,9 @@ export function Picker() {
 
   const featured = picks[active] ?? null;
   const tv = media === "tv";
-  const noun = tv ? "series" : "movie";
+  const noun = media === "all" ? "watch" : tv ? "series" : "movie";
 
-  const switchMedia = (next: MediaType) => {
+  const switchMedia = (next: PickMedia) => {
     if (next === media) return;
     setMedia(next);
     // Drop genres with no TV equivalent so the chip count matches what's sent.
@@ -91,7 +91,8 @@ export function Picker() {
       minRating: String(minRating),
       maxRuntime: String(tv ? 0 : (maxRuntime ?? 0)),
       count: String(count),
-      exclude: seen[media].slice(-80).join(","),
+      exclude: seen.movie.slice(-80).join(","),
+      excludeTv: seen.tv.slice(-80).join(","),
     });
     try {
       // Hold the shuffle for a beat so the reveal reads as a reveal, not a flicker.
@@ -105,7 +106,8 @@ export function Picker() {
       }
       setPicks(data.movies);
       setActive(0);
-      setSeen((s) => ({ ...s, [media]: [...s[media], ...data.movies.map((m) => m.id)] }));
+      const shown = (type: MediaType) => data.movies.filter((m) => m.mediaType === type).map((m) => m.id);
+      setSeen((s) => ({ movie: [...s.movie, ...shown("movie")], tv: [...s.tv, ...shown("tv")] }));
       setStatus("done");
     } catch {
       setStatus("error");
@@ -117,7 +119,7 @@ export function Picker() {
       <div className="mb-8 max-w-2xl">
         <p className="text-xs font-medium uppercase tracking-[0.3em] text-accent">Can’t decide?</p>
         <h2 id="pick-heading" className="mt-2 font-display text-5xl leading-none tracking-wide sm:text-6xl">
-          Let us pick tonight’s {noun}
+          {media === "all" ? "Let us pick what to watch tonight" : `Let us pick tonight’s ${noun}`}
         </h2>
         <p className="mt-3 text-ink/70">Set a mood, narrow it down if you like, and roll for a shortlist. Don’t like any of them? Roll again, we won’t repeat ourselves.</p>
       </div>
@@ -125,7 +127,7 @@ export function Picker() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
         <div className="glass rounded-3xl p-6 sm:p-7">
           <div className="mb-7">
-            <MediaToggle value={media} onChange={switchMedia} layoutGroup="picker" />
+            <MediaToggle value={media} onChange={switchMedia} layoutGroup="picker" includeAll />
           </div>
           <Label>Mood</Label>
           <div className="flex flex-wrap gap-2">
@@ -165,7 +167,7 @@ export function Picker() {
 
           {!tv && (
             <div className="mt-7">
-              <Label>Length</Label>
+              <Label>Length {media === "all" && <span className="normal-case tracking-normal">· movies only</span>}</Label>
               <div className="flex flex-wrap gap-2">
                 {RUNTIMES.map((r) => (
                   <Chip key={r.label} on={maxRuntime === r.value} onClick={() => setMaxRuntime(r.value)}>
@@ -198,7 +200,7 @@ export function Picker() {
             <div className="flex flex-wrap gap-2">
               {COUNTS.map((n) => (
                 <Chip key={n} on={count === n} onClick={() => setCount(n)}>
-                  {n === 1 ? "Just one" : `${n} ${tv ? "series" : "movies"}`}
+                  {n === 1 ? "Just one" : `${n} ${media === "all" ? "titles" : tv ? "series" : "movies"}`}
                 </Chip>
               ))}
             </div>
@@ -256,7 +258,7 @@ export function Picker() {
                         <h3 className="mt-2 text-3xl font-semibold leading-tight sm:text-4xl">{featured.title}</h3>
                         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink/70">
                           <RatingBadge rating={featured.rating} />
-                          <span>{[featured.year, ...genreNames(featured.genreIds)].filter(Boolean).join(" · ")}</span>
+                          <span>{[featured.mediaType === "tv" ? "Series" : null, featured.year, ...genreNames(featured.genreIds)].filter(Boolean).join(" · ")}</span>
                         </div>
                         <p className="mt-4 line-clamp-3 max-w-xl text-[15px] leading-relaxed text-ink/85">{featured.overview}</p>
                         <div className="mt-6 flex flex-wrap gap-3">
@@ -301,6 +303,7 @@ export function Picker() {
                             <span className="min-w-0">
                               <span className="block truncate text-sm font-medium">{m.title}</span>
                               <span className="block text-xs text-muted">
+                                {m.mediaType === "tv" ? "Series · " : ""}
                                 {m.year ?? "TBA"} {m.rating ? `· ★ ${m.rating.toFixed(1)}` : ""}
                               </span>
                             </span>
