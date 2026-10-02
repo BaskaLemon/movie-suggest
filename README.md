@@ -20,7 +20,9 @@ Without a key the site runs on a bundled demo catalogue of 48 films and 22 serie
 
 Sign-in is optional. An account holds up to 5 profiles ("Who's watching?"), each with its own name, colour, default picker mode and watchlist. Passwords are hashed with scrypt; sessions are random tokens in an httpOnly cookie, stored hashed.
 
-Data lives in a SQLite database through [Prisma](https://www.prisma.io/) (`prisma/schema.prisma`): users, profiles, sessions and watchlist items. By default it's the file `prisma/dev.db` (git-ignored). Set `DATABASE_URL` to use another libsql/SQLite database, such as a hosted Turso URL.
+Data lives in a SQLite database through [Prisma](https://www.prisma.io/) 7 (`prisma/schema.prisma`): users, profiles, sessions and watchlist items.
+
+You don't need a database URL to run locally: the default is the file `prisma/dev.db` (git-ignored), created on first `bun dev`. To use a different database, set `DATABASE_URL` in `.env.local`. Both the app and the Prisma commands read it. It accepts a SQLite file (`file:./prisma/other.db`) or a hosted libsql database such as [Turso](https://turso.tech) (`libsql://<db>-<org>.turso.io?authToken=<token>`).
 
 - `bun install` generates the Prisma client (`generated/prisma`, git-ignored).
 - `bun dev` / `bun start` apply pending migrations first, so a fresh checkout creates the database on first run.

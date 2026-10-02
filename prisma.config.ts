@@ -1,7 +1,10 @@
+import { loadEnvConfig } from "@next/env";
 import { defineConfig } from "prisma/config";
+import { DEFAULT_DATABASE_URL } from "./lib/database-url";
 
-// SQLite file for local use. Override with DATABASE_URL (e.g. a Turso/libsql URL).
-export const DEFAULT_DATABASE_URL = "file:./prisma/dev.db";
+// Load .env / .env.local the same way Next does, so the Prisma CLI (migrate, studio)
+// and the running app always point at the same database.
+loadEnvConfig(process.cwd());
 
 export default defineConfig({
   schema: "prisma/schema.prisma",

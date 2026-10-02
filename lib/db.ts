@@ -1,6 +1,6 @@
 import { PrismaLibSql } from "@prisma/adapter-libsql";
 import { PrismaClient } from "@/generated/prisma/client";
-import { DEFAULT_DATABASE_URL } from "../prisma.config";
+import { DEFAULT_DATABASE_URL } from "./database-url";
 
 // One client per process; in dev, reuse it across hot reloads instead of opening a new connection each time.
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
