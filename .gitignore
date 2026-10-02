@@ -41,5 +41,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local account data (users, profiles, sessions)
-/.data/
+
+# prisma: generated client and local SQLite database
+/generated/
+/prisma/*.db
+/prisma/*.db-journal

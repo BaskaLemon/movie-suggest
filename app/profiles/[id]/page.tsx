@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ProfileForm } from "@/components/ProfileForm";
 import { PROFILE_COLORS, getViewer } from "@/lib/auth";
+import { asPickMedia } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Profile settings" };
 
@@ -23,7 +24,7 @@ export default async function EditProfilePage({ params }: PageProps<"/profiles/[
         <ProfileForm
           key={profile.id}
           colors={PROFILE_COLORS}
-          profile={{ id: profile.id, name: profile.name, color: profile.color, defaultMedia: profile.defaultMedia }}
+          profile={{ id: profile.id, name: profile.name, color: profile.color, defaultMedia: asPickMedia(profile.defaultMedia) }}
           canDelete={viewer.profiles.length > 1}
         />
       </div>

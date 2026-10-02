@@ -1,8 +1,9 @@
-import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { cache } from "react";
-import { read, transact, type Profile } from "./db";
-import type { PickMedia } from "./types";
+import { prisma, type Profile } from "./db";
+import type { Movie, PickMedia } from "./types";
+import { fromWatchlistRow } from "./watchlist-db";
 
 const COOKIE = "rp_session";
 const SESSION_DAYS = 30;
@@ -27,45 +28,34 @@ export async function verifyPassword(password: string, salt: string, passwordHas
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
-// Only a hash of the session token is stored, so a leaked data file can't be replayed as cookies.
+// Only a hash of the session token is stored, so a leaked database can't be replayed as cookies.
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
 export async function startSession(userId: string, profileId: string | null) {
   const token = randomBytes(32).toString("base64url");
-  const expiresAt = Date.now() + SESSION_DAYS * 86_400_000;
-  await transact((d) => {
-    d.sessions = d.sessions.filter((s) => s.expiresAt > Date.now());
-    d.sessions.push({ tokenHash: hashToken(token), userId, profileId, expiresAt });
-  });
+  const expiresAt = new Date(Date.now() + SESSION_DAYS * 86_400_000);
+  await prisma.session.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+  await prisma.session.create({ data: { tokenHash: hashToken(token), userId, profileId, expiresAt } });
   (await cookies()).set(COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    expires: new Date(expiresAt),
+    expires: expiresAt,
   });
 }
 
 export async function endSession() {
   const store = await cookies();
   const token = store.get(COOKIE)?.value;
-  if (token) {
-    const tokenHash = hashToken(token);
-    await transact((d) => {
-      d.sessions = d.sessions.filter((s) => s.tokenHash !== tokenHash);
-    });
-  }
+  if (token) await prisma.session.deleteMany({ where: { tokenHash: hashToken(token) } });
   store.delete(COOKIE);
 }
 
 export async function setSessionProfile(profileId: string | null) {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return;
-  const tokenHash = hashToken(token);
-  await transact((d) => {
-    const s = d.sessions.find((x) => x.tokenHash === tokenHash);
-    if (s) s.profileId = profileId;
-  });
+  await prisma.session.updateMany({ where: { tokenHash: hashToken(token) }, data: { profileId } });
 }
 
 export type Viewer = {
@@ -73,22 +63,32 @@ export type Viewer = {
   email: string;
   profiles: Profile[];
   profile: Profile | null;
+  // The active profile's watchlist, newest first.
+  watchlist: Movie[];
 };
 
 // Cached per request so the layout and page share one lookup.
 export const getViewer = cache(async (): Promise<Viewer | null> => {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
-  const tokenHash = hashToken(token);
-  return read((d) => {
-    const session = d.sessions.find((s) => s.tokenHash === tokenHash && s.expiresAt > Date.now());
-    const user = session && d.users.find((u) => u.id === session.userId);
-    if (!session || !user) return null;
-    const profiles = d.profiles.filter((p) => p.userId === user.id).sort((a, b) => a.createdAt - b.createdAt);
-    return { userId: user.id, email: user.email, profiles, profile: profiles.find((p) => p.id === session.profileId) ?? null };
+  const session = await prisma.session.findUnique({
+    where: { tokenHash: hashToken(token) },
+    include: {
+      user: { include: { profiles: { orderBy: { createdAt: "asc" } } } },
+      profile: { include: { watchlist: { orderBy: { addedAt: "desc" } } } },
+    },
   });
+  if (!session || session.expiresAt < new Date()) return null;
+  const { user, profile } = session;
+  return {
+    userId: user.id,
+    email: user.email,
+    profiles: user.profiles,
+    profile: profile ? user.profiles.find((p) => p.id === profile.id) ?? null : null,
+    watchlist: profile ? profile.watchlist.map(fromWatchlistRow) : [],
+  };
 });
 
-export function newProfile(userId: string, name: string, index: number, defaultMedia: PickMedia = "all"): Profile {
-  return { id: randomUUID(), userId, name, color: PROFILE_COLORS[index % PROFILE_COLORS.length], defaultMedia, createdAt: Date.now() + index };
+export function profileDefaults(index: number): { color: string; defaultMedia: PickMedia } {
+  return { color: PROFILE_COLORS[index % PROFILE_COLORS.length], defaultMedia: "all" };
 }

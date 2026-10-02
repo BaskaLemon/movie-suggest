@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  salt         String
+  createdAt    DateTime  @default(now())
+  profiles     Profile[]
+  sessions     Session[]
+}
+
+model Profile {
+  id           String          @id @default(uuid())
+  userId       String
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  color        String
+  // "all" | "movie" | "tv": what the picker starts on.
+  defaultMedia String          @default("all")
+  createdAt    DateTime        @default(now())
+  watchlist    WatchlistItem[]
+  sessions     Session[]
+
+  @@index([userId])
+}
+
+model Session {
+  // sha256 of the cookie token; the token itself is never stored.
+  tokenHash String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profileId String?
+  profile   Profile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  expiresAt DateTime
+
+  @@index([userId])
+}
+
+// A snapshot of the title as it was when saved, so the list renders without TMDB calls.
+model WatchlistItem {
+  id        Int      @id @default(autoincrement())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  // "movie" | "tv"; TMDB ids are only unique within a media type.
+  mediaType String
+  tmdbId    Int
+  title     String
+  overview  String
+  year      Int?
+  rating    Float
+  voteCount Int
+  // JSON array of TMDB genre ids.
+  genreIds  String
+  poster    String?
+  backdrop  String?
+  addedAt   DateTime @default(now())
+
+  @@unique([profileId, mediaType, tmdbId])
+  @@index([profileId, addedAt])
+}

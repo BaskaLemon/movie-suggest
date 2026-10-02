@@ -6,6 +6,7 @@ import { SideRail } from "@/components/SideRail";
 import { ViewerProvider, type ClientViewer } from "@/components/ViewerProvider";
 import { getViewer } from "@/lib/auth";
 import type { Profile } from "@/lib/db";
+import { asPickMedia } from "@/lib/types";
 import { hasTmdb } from "@/lib/catalog";
 import "./globals.css";
 
@@ -33,10 +34,15 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     id: p.id,
     name: p.name,
     color: p.color,
-    defaultMedia: p.defaultMedia,
+    defaultMedia: asPickMedia(p.defaultMedia),
   });
   const clientViewer: ClientViewer | null = viewer
-    ? { email: viewer.email, profile: viewer.profile ? toClient(viewer.profile) : null, profiles: viewer.profiles.map(toClient) }
+    ? {
+        email: viewer.email,
+        profile: viewer.profile ? toClient(viewer.profile) : null,
+        profiles: viewer.profiles.map(toClient),
+        watchlist: viewer.watchlist,
+      }
     : null;
 
   return (

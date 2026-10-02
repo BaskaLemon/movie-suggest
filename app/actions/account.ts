@@ -1,6 +1,5 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
@@ -9,12 +8,12 @@ import {
   endSession,
   getViewer,
   hashPassword,
-  newProfile,
+  profileDefaults,
   setSessionProfile,
   startSession,
   verifyPassword,
 } from "@/lib/auth";
-import { read, transact } from "@/lib/db";
+import { prisma } from "@/lib/db";
 import type { PickMedia } from "@/lib/types";
 
 export type FormState = { error?: string; ok?: string };
@@ -39,17 +38,15 @@ export async function signUp(_: FormState, fd: FormData): Promise<FormState> {
   if (!isEmail(email)) return { error: "Enter a valid email address." };
   if (password.length < 8) return { error: "Use a password of at least 8 characters." };
 
+  if (await prisma.user.findUnique({ where: { email } })) {
+    return { error: "An account with that email already exists. Sign in instead." };
+  }
   const { salt, passwordHash } = await hashPassword(password);
-  const created = await transact((d) => {
-    if (d.users.some((u) => u.email === email)) return null;
-    const user = { id: randomUUID(), email, salt, passwordHash, createdAt: Date.now() };
-    const profile = newProfile(user.id, name, 0);
-    d.users.push(user);
-    d.profiles.push(profile);
-    return { userId: user.id, profileId: profile.id };
+  const user = await prisma.user.create({
+    data: { email, salt, passwordHash, profiles: { create: { name, ...profileDefaults(0) } } },
+    include: { profiles: true },
   });
-  if (!created) return { error: "An account with that email already exists. Sign in instead." };
-  await startSession(created.userId, created.profileId);
+  await startSession(user.id, user.profiles[0].id);
   refreshViewer();
   redirect("/");
 }
@@ -57,15 +54,15 @@ export async function signUp(_: FormState, fd: FormData): Promise<FormState> {
 export async function signIn(_: FormState, fd: FormData): Promise<FormState> {
   const email = text(fd, "email").toLowerCase();
   const password = String(fd.get("password") ?? "");
-  const user = await read((d) => d.users.find((u) => u.email === email));
+  const user = await prisma.user.findUnique({ where: { email }, include: { profiles: { select: { id: true } } } });
   // Same message for unknown email and wrong password, so emails can't be probed.
   if (!user || !(await verifyPassword(password, user.salt, user.passwordHash))) {
     return { error: "That email and password don't match." };
   }
-  const profiles = await read((d) => d.profiles.filter((p) => p.userId === user.id));
-  await startSession(user.id, profiles.length === 1 ? profiles[0].id : null);
+  const only = user.profiles.length === 1 ? user.profiles[0].id : null;
+  await startSession(user.id, only);
   refreshViewer();
-  redirect(profiles.length === 1 ? "/" : "/profiles");
+  redirect(only ? "/" : "/profiles");
 }
 
 export async function signOut() {
@@ -103,29 +100,20 @@ export async function createProfile(_: FormState, fd: FormData): Promise<FormSta
   const viewer = await requireViewer();
   const form = readProfileForm(fd);
   if (!validName(form.name)) return { error: "Enter a name up to 20 characters." };
-  const id = await transact((d) => {
-    const mine = d.profiles.filter((p) => p.userId === viewer.userId);
-    if (mine.length >= MAX_PROFILES) return null;
-    const profile = { ...newProfile(viewer.userId, form.name, mine.length), color: form.color, defaultMedia: form.defaultMedia };
-    d.profiles.push(profile);
-    return profile.id;
-  });
-  if (!id) return { error: `You can have up to ${MAX_PROFILES} profiles.` };
+  const count = await prisma.profile.count({ where: { userId: viewer.userId } });
+  if (count >= MAX_PROFILES) return { error: `You can have up to ${MAX_PROFILES} profiles.` };
+  await prisma.profile.create({ data: { ...form, userId: viewer.userId } });
   refreshViewer();
   redirect("/profiles");
 }
 
 export async function updateProfile(_: FormState, fd: FormData): Promise<FormState> {
   const viewer = await requireViewer();
-  const id = text(fd, "id");
   const form = readProfileForm(fd);
   if (!validName(form.name)) return { error: "Enter a name up to 20 characters." };
-  const found = await transact((d) => {
-    const p = d.profiles.find((x) => x.id === id && x.userId === viewer.userId);
-    if (p) Object.assign(p, form);
-    return Boolean(p);
-  });
-  if (!found) return { error: "That profile no longer exists." };
+  // Scoped to the viewer's own profiles, so an id from another account matches nothing.
+  const { count } = await prisma.profile.updateMany({ where: { id: text(fd, "id"), userId: viewer.userId }, data: form });
+  if (!count) return { error: "That profile no longer exists." };
   refreshViewer();
   return { ok: "Saved." };
 }
@@ -133,10 +121,8 @@ export async function updateProfile(_: FormState, fd: FormData): Promise<FormSta
 export async function deleteProfile(profileId: string) {
   const viewer = await requireViewer();
   if (viewer.profiles.length <= 1) return;
-  await transact((d) => {
-    d.profiles = d.profiles.filter((p) => !(p.id === profileId && p.userId === viewer.userId));
-    for (const s of d.sessions) if (s.profileId === profileId) s.profileId = null;
-  });
+  // Sessions on this profile fall back to "Choose profile"; its watchlist goes with it (cascade).
+  await prisma.profile.deleteMany({ where: { id: profileId, userId: viewer.userId } });
   refreshViewer();
   redirect("/profiles");
 }
@@ -146,14 +132,10 @@ export async function changePassword(_: FormState, fd: FormData): Promise<FormSt
   const current = String(fd.get("current") ?? "");
   const next = String(fd.get("next") ?? "");
   if (next.length < 8) return { error: "Use a new password of at least 8 characters." };
-  const user = await read((d) => d.users.find((u) => u.id === viewer.userId));
+  const user = await prisma.user.findUnique({ where: { id: viewer.userId } });
   if (!user || !(await verifyPassword(current, user.salt, user.passwordHash))) {
     return { error: "Your current password is wrong." };
   }
-  const { salt, passwordHash } = await hashPassword(next);
-  await transact((d) => {
-    const u = d.users.find((x) => x.id === viewer.userId);
-    if (u) Object.assign(u, { salt, passwordHash });
-  });
+  await prisma.user.update({ where: { id: user.id }, data: await hashPassword(next) });
   return { ok: "Password updated." };
 }

@@ -7,14 +7,15 @@ import { useEffect, useState } from "react";
 
 const ITEMS = [
   { href: "/", label: "Home", icon: Home },
-  { href: "/#pick", label: "Pick for me", icon: Dices },
   { href: "/#series", label: "Series", icon: Tv },
+  { href: "/#pick", label: "Pick for me", icon: Dices },
   { href: "/#browse", label: "Browse", icon: Compass },
   { href: "/search", label: "Search", icon: Search },
   { href: "/watchlist", label: "Watchlist", icon: Bookmark },
 ];
 
-const SECTIONS = ["pick", "series", "browse"];
+// In page order, matching the icons above.
+const SECTIONS = ["series", "pick", "browse"];
 
 // On the home page, the last section whose top has crossed 40% of the viewport.
 function useActiveSection(enabled: boolean) {

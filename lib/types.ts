@@ -57,3 +57,7 @@ export type PickFilters = {
 export function titleHref(m: Pick<Movie, "id" | "mediaType">) {
   return `/${m.mediaType === "tv" ? "tv" : "movie"}/${m.id}`;
 }
+
+export function asPickMedia(v: string): PickMedia {
+  return v === "movie" || v === "tv" ? v : "all";
+}
