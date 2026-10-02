@@ -8,7 +8,7 @@ Built with Next.js 16 (App Router), Tailwind CSS 4, Motion and lucide icons. Dat
 
 ```bash
 bun install
-cp .env.example .env.local   # then paste your TMDB key
+echo "TMDB_API_KEY=your_key_here" > .env.local
 bun dev
 ```
 
