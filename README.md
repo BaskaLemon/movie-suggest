@@ -25,8 +25,9 @@ Data lives in a SQLite database through [Prisma](https://www.prisma.io/) 7 (`pri
 You don't need a database URL to run locally: the default is the file `prisma/dev.db` (git-ignored), created on first `bun dev`. To use a different database, set `DATABASE_URL` in `.env.local`. Both the app and the Prisma commands read it. It accepts a SQLite file (`file:./prisma/other.db`) or a hosted libsql database such as [Turso](https://turso.tech) (`libsql://<db>-<org>.turso.io?authToken=<token>`).
 
 - `bun install` generates the Prisma client (`generated/prisma`, git-ignored).
-- `bun dev` / `bun start` apply pending migrations first, so a fresh checkout creates the database on first run.
-- `bun run db:migrate` creates a migration after you change the schema; `bun run db:studio` opens Prisma Studio to browse the data.
+- `bun dev` / `bun start` apply pending migrations first (`scripts/migrate.mjs`), so a fresh database gets its tables on first run. For a local file this runs `prisma migrate deploy`; Prisma's migration engine doesn't accept Turso URLs, so for those the script applies `prisma/migrations/*/migration.sql` itself and records them in the same `_prisma_migrations` table. `bun run db:deploy` runs it on its own.
+- `bun run db:migrate` creates a new migration after you change the schema. It always works against the local file; the next `bun dev` applies it to Turso.
+- `bun run db:studio` opens Prisma Studio for a local file. Studio can't open Turso; use the [Turso dashboard](https://app.turso.tech) or `turso db shell <db>` instead.
 
 Signed-in profiles keep their watchlist in the database, so it follows the account across browsers. Signed-out visitors keep a list in browser storage; it moves into the profile the first time they sign in.
 
