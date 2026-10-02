@@ -35,7 +35,7 @@ Signed-in profiles keep their watchlist in the database, so it follows the accou
 
 Set these in Vercel → Project → Settings → Environment Variables, then redeploy:
 
-- `DATABASE_URL`: your Turso URL (`libsql://<db>-<org>.turso.io?authToken=<token>`). Required: Vercel's filesystem can't hold a SQLite file, so the build stops with an explanation if this is missing.
+- `DATABASE_URL`: your Turso URL including the token (`libsql://<db>-<org>.turso.io?authToken=<token>`). Or use Turso's pair `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN`, which the Vercel–Turso integration sets for you. Required: Vercel's filesystem can't hold a SQLite file, so the build stops with an explanation if no database is set. A `401` in the build log means the token is missing or invalid; the log says which.
 - `TMDB_API_KEY` (or `TMDB_ACCESS_TOKEN`): without it the site shows the demo catalogue.
 
 `build` applies pending migrations to the database before `next build`, so schema changes reach Turso on each deploy. Posters load straight from TMDB's CDN (`images.unoptimized`), so they don't count against Vercel's image optimisation quota.

@@ -1,7 +1,7 @@
 import { PrismaClient } from "@/generated/prisma/client";
-import { DEFAULT_DATABASE_URL } from "./database-url";
+import { databaseConfig } from "./database-url";
 
-const url = process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL;
+const { url, authToken } = databaseConfig();
 
 // The Node libsql client loads a native binary as soon as it's imported (via a computed
 // require that serverless file tracing can miss). Remote databases such as Turso only need
@@ -13,7 +13,7 @@ const { PrismaLibSql } = url.startsWith("file:")
 // One client per process; in dev, reuse it across hot reloads instead of opening a new connection each time.
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter: new PrismaLibSql({ url }) });
+export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter: new PrismaLibSql({ url, authToken }) });
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 

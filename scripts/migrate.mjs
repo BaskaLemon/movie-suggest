@@ -9,15 +9,15 @@ import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
-import { databaseUrl, isLocalFile } from "./env.mjs";
+import { authToken, databaseUrl, isLocalFile } from "./env.mjs";
 
 // On Vercel the filesystem is read-only and reset per request, so a SQLite file can't hold
 // accounts. Fail the build with the fix instead of deploying a site whose sign-in is broken.
 if (isLocalFile && process.env.VERCEL) {
   console.error(
-    "DATABASE_URL is not set for this Vercel deployment, so the app would fall back to a local SQLite file, " +
-      "which can't work on Vercel.\nAdd your Turso URL as DATABASE_URL in Vercel → Project → Settings → " +
-      "Environment Variables, then redeploy.",
+    "No database is set for this Vercel deployment, so the app would fall back to a local SQLite file, " +
+      "which can't work on Vercel.\nIn Vercel → Project → Settings → Environment Variables, set DATABASE_URL to " +
+      "libsql://<db>.turso.io?authToken=<token> (or TURSO_DATABASE_URL + TURSO_AUTH_TOKEN), then redeploy.",
   );
   process.exit(1);
 }
@@ -34,7 +34,7 @@ const names = (await readdir(dir, { withFileTypes: true }))
   .map((d) => d.name)
   .sort();
 
-const db = createClient({ url: databaseUrl });
+const db = createClient({ url: databaseUrl, authToken });
 const host = new URL(databaseUrl).host;
 
 try {
@@ -80,7 +80,18 @@ try {
   }
   console.log(count ? `${count} migration(s) applied to ${host}.` : `Database at ${host} is up to date.`);
 } catch (err) {
-  console.error(`Migrating ${host} failed:`, err instanceof Error ? err.message : err);
+  const message = err instanceof Error ? err.message : String(err);
+  console.error(`Migrating ${host} failed: ${message}`);
+  if (/\b401\b/.test(message)) {
+    const hasToken = Boolean(authToken) || new URL(databaseUrl).searchParams.has("authToken");
+    console.error(
+      hasToken
+        ? "Turso rejected the auth token. It may be expired, revoked, or for another database. Create a new one with " +
+            "`turso db tokens create <db>` (or in the Turso dashboard) and update it where you set it."
+        : "No Turso auth token was sent. Either end DATABASE_URL with ?authToken=<token>, or set TURSO_AUTH_TOKEN " +
+            "(or DATABASE_AUTH_TOKEN) next to it.",
+    );
+  }
   process.exit(1);
 } finally {
   db.close();
