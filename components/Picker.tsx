@@ -7,6 +7,7 @@ import { useState } from "react";
 import { MediaToggle } from "./MediaToggle";
 import { Poster } from "./Poster";
 import { RatingBadge } from "./RatingBadge";
+import { useViewer } from "./ViewerProvider";
 import { WatchlistButton } from "./WatchlistButton";
 import { ERAS, GENRES, MOODS, RUNTIMES, TV_GENRES, genreNames } from "@/lib/genres";
 import { titleHref, type MediaType, type Movie, type PickMedia } from "@/lib/types";
@@ -48,7 +49,7 @@ function Label({ children }: { children: React.ReactNode }) {
 
 export function Picker() {
   const reduce = useReducedMotion();
-  const [media, setMedia] = useState<PickMedia>("all");
+  const [media, setMedia] = useState<PickMedia>(useViewer()?.profile?.defaultMedia ?? "all");
   const [genres, setGenres] = useState<number[]>([]);
   const [era, setEra] = useState("any");
   const [minRating, setMinRating] = useState(6.5);

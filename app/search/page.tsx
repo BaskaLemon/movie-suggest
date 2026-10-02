@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import { MovieCard } from "@/components/MovieCard";
-import { SearchBox } from "@/components/SearchBox";
-import { searchMovies } from "@/lib/catalog";
+import { SearchView } from "@/components/SearchView";
+import { getList, searchMovies } from "@/lib/catalog";
 
 export async function generateMetadata({ searchParams }: PageProps<"/search">): Promise<Metadata> {
   const q = (await searchParams).q;
@@ -11,19 +10,13 @@ export async function generateMetadata({ searchParams }: PageProps<"/search">): 
 export default async function SearchPage({ searchParams }: PageProps<"/search">) {
   const raw = (await searchParams).q;
   const q = typeof raw === "string" ? raw.trim().slice(0, 100) : "";
-  const results = q ? await searchMovies(q) : [];
+  const [results, movies, series] = await Promise.all([
+    q ? searchMovies(q) : Promise.resolve([]),
+    getList("trending"),
+    getList("trending", undefined, "tv"),
+  ]);
+  // Shown before anything is typed: alternate trending movies and series.
+  const suggestions = movies.slice(0, 6).flatMap((m, i) => (series[i] ? [m, series[i]] : [m]));
 
-  return (
-    <div className="px-4 pt-28 sm:px-8">
-      <h1 className="font-display text-6xl tracking-wide sm:text-7xl">{q ? `Results for “${q}”` : "Search"}</h1>
-      <SearchBox className="mt-6 max-w-xl md:hidden" />
-      {q && <p className="mt-2 text-muted">{results.length ? `${results.length} ${results.length === 1 ? "title" : "titles"} found` : "Nothing matched. Try a shorter title or an actor’s name."}</p>}
-      {!q && <p className="mt-2 text-muted">Find a movie or series by title or cast.</p>}
-      <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-        {results.map((m) => (
-          <MovieCard key={`${m.mediaType}-${m.id}`} movie={m} />
-        ))}
-      </div>
-    </div>
-  );
+  return <SearchView initialQuery={q} initialResults={results} suggestions={suggestions} />;
 }

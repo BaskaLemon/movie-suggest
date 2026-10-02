@@ -4,20 +4,14 @@ import { Bookmark, Search } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { ProfileMenu } from "./ProfileMenu";
 import { SearchBox } from "./SearchBox";
 import { useWatchlist } from "@/lib/watchlist";
 
-const NAV = [
-  { href: "/", label: "Home" },
-  { href: "/#pick", label: "Pick for me" },
-  { href: "/#series", label: "Series" },
-  { href: "/#browse", label: "Browse" },
-  { href: "/watchlist", label: "Watchlist" },
-];
-
 export function Header() {
-  const pathname = usePathname();
   const { list } = useWatchlist();
+  // The search page has its own big input.
+  const onSearch = usePathname() === "/search";
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -34,30 +28,13 @@ export function Header() {
       }`}
     >
       <div className="flex h-16 items-center gap-4 px-4 sm:px-8 lg:pl-28">
-        <Link href="/" className="font-display text-3xl tracking-[0.12em] text-ink lg:order-2 lg:mx-auto">
+        <Link href="/" className="font-display text-3xl tracking-[0.12em] text-ink">
           REEL<span className="text-accent">PICK</span>
         </Link>
 
-        <nav aria-label="Main" className="hidden items-center gap-7 text-sm font-medium lg:order-1 lg:flex">
-          {NAV.map((item) => {
-            const current = item.href === pathname;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={current ? "page" : undefined}
-                className={`relative transition hover:text-ink ${current ? "text-ink" : "text-ink/70"}`}
-              >
-                {item.label}
-                {current && <span className="absolute -bottom-2 left-1/2 size-1 -translate-x-1/2 rounded-full bg-accent" />}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="ml-auto flex items-center gap-3 lg:order-3 lg:ml-0">
-          <SearchBox className="hidden w-72 md:block" />
-          <Link href="/search" aria-label="Search" className="grid size-10 place-items-center rounded-full text-ink/80 hover:bg-white/10 md:hidden">
+        <div className="ml-auto flex items-center gap-3">
+          {!onSearch && <SearchBox className="hidden w-72 md:block" />}
+          <Link href="/search" aria-label="Search" className={`size-10 place-items-center rounded-full text-ink/80 hover:bg-white/10 md:hidden ${onSearch ? "hidden" : "grid"}`}>
             <Search size={20} />
           </Link>
           <Link
@@ -72,6 +49,7 @@ export function Header() {
               </span>
             )}
           </Link>
+          <ProfileMenu />
         </div>
       </div>
     </header>

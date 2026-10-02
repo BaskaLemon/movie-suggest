@@ -4,12 +4,15 @@ import { Bookmark, Dices, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MovieCard } from "./MovieCard";
+import { useViewer } from "./ViewerProvider";
 import { titleHref } from "@/lib/types";
 import { useWatchlist } from "@/lib/watchlist";
 
 export function WatchlistView() {
   const router = useRouter();
   const { list, remove } = useWatchlist();
+  const profile = useViewer()?.profile;
+  const owner = profile ? `${profile.name}’s list` : "Saved on this device, no account needed.";
 
   return (
     <div className="px-4 pt-28 sm:px-8">
@@ -18,7 +21,7 @@ export function WatchlistView() {
           <p className="text-xs font-medium uppercase tracking-[0.3em] text-accent">Saved for later</p>
           <h1 className="mt-2 font-display text-6xl tracking-wide sm:text-7xl">Your watchlist</h1>
           <p className="mt-2 text-muted">
-            {list.length ? `${list.length} ${list.length === 1 ? "title" : "titles"}, saved on this device.` : "Saved on this device, no account needed."}
+            {list.length ? `${list.length} ${list.length === 1 ? "title" : "titles"}${profile ? ` on ${profile.name}’s list` : ", saved on this device"}.` : owner}
           </p>
         </div>
         {list.length > 1 && (
