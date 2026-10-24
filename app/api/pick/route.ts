@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     maxRuntime: maxRuntime > 0 ? maxRuntime : null,
   };
   // Movie and series ids overlap on TMDB, so already-shown titles come in two lists.
-  const exclude = { movie: ids(q.get("exclude")).slice(-100), tv: ids(q.get("excludeTv")).slice(-100) };
+  const exclude = { movie: ids(q.get("exclude")).slice(-500), tv: ids(q.get("excludeTv")).slice(-500) };
   const n = Number.isInteger(count) ? Math.min(Math.max(count, 1), 8) : 5;
   const result =
     media === "all"

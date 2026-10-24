@@ -102,5 +102,6 @@ export function fallbackDetail(media: MediaType, id: number): MovieDetail | null
       ? Array.from({ length: show.seasons }, (_, i) => ({ number: i + 1, name: `Season ${i + 1}`, episodes: null, year: null, poster: null }))
       : [],
     episodeCount: show?.episodes ?? null,
+    watchProviders: {},
   };
 }

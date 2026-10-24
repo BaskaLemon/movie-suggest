@@ -63,8 +63,9 @@ export type Viewer = {
   email: string;
   profiles: Profile[];
   profile: Profile | null;
-  // The active profile's watchlist, newest first.
+  // The active profile's lists, newest first.
   watchlist: Movie[];
+  watched: Movie[];
 };
 
 // Cached per request so the layout and page share one lookup.
@@ -75,7 +76,7 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
     where: { tokenHash: hashToken(token) },
     include: {
       user: { include: { profiles: { orderBy: { createdAt: "asc" } } } },
-      profile: { include: { watchlist: { orderBy: { addedAt: "desc" } } } },
+      profile: { include: { watchlist: { orderBy: { addedAt: "desc" } }, watched: { orderBy: { addedAt: "desc" } } } },
     },
   });
   if (!session || session.expiresAt < new Date()) return null;
@@ -86,6 +87,7 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
     profiles: user.profiles,
     profile: profile ? user.profiles.find((p) => p.id === profile.id) ?? null : null,
     watchlist: profile ? profile.watchlist.map(fromWatchlistRow) : [],
+    watched: profile ? profile.watched.map(fromWatchlistRow) : [],
   };
 });
 

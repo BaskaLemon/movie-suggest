@@ -1,7 +1,10 @@
 import type { WatchlistItem } from "./db";
 import type { MediaType, Movie } from "./types";
 
-export function fromWatchlistRow(row: WatchlistItem): Movie {
+export type ListName = "watchlist" | "watched";
+
+// Works for both WatchlistItem and WatchedItem rows, which share a shape.
+export function fromWatchlistRow(row: Omit<WatchlistItem, "id">): Movie {
   let genreIds: number[] = [];
   try {
     const parsed = JSON.parse(row.genreIds);

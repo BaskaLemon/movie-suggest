@@ -5,7 +5,7 @@ import { useWatchlist } from "@/lib/watchlist";
 import type { Movie } from "@/lib/types";
 
 // Store only the summary fields so detail payloads (cast, similar) don't bloat localStorage.
-function summary(m: Movie): Movie {
+export function summary(m: Movie): Movie {
   const { id, mediaType, title, overview, year, rating, voteCount, genreIds, poster, backdrop } = m;
   return { id, mediaType, title, overview, year, rating, voteCount, genreIds, poster, backdrop };
 }

@@ -1,6 +1,6 @@
 import { eraRange, toTvGenres } from "./genres";
 import { fallbackDetail, fallbackList, fallbackMatches, fallbackSearch } from "./fallback";
-import type { CastMember, ListKind, MediaType, Movie, MovieDetail, PickFilters, Season } from "./types";
+import type { CastMember, ListKind, MediaType, Movie, MovieDetail, PickFilters, Provider, Season, WatchProviders } from "./types";
 
 // Server-only data access. Every call falls back to the bundled catalogue so the
 // site still works without a key or when TMDB is down.
@@ -45,7 +45,29 @@ type TmdbDetail = TmdbTitle & {
   videos?: { results: { key: string; site: string; type: string; official: boolean }[] };
   recommendations?: TmdbPage;
   similar?: TmdbPage;
+  "watch/providers"?: { results: Record<string, TmdbRegionProviders> };
 };
+
+type TmdbProvider = { provider_id: number; provider_name: string; logo_path: string | null; display_priority: number };
+type TmdbRegionProviders = { link?: string; flatrate?: TmdbProvider[]; free?: TmdbProvider[]; ads?: TmdbProvider[]; rent?: TmdbProvider[]; buy?: TmdbProvider[] };
+
+function toProviders(region: TmdbRegionProviders): WatchProviders {
+  const list = (...groups: (TmdbProvider[] | undefined)[]): Provider[] => {
+    const seen = new Set<number>();
+    return groups
+      .flatMap((g) => g ?? [])
+      .sort((a, b) => a.display_priority - b.display_priority)
+      .filter((p) => !seen.has(p.provider_id) && seen.add(p.provider_id))
+      .map((p) => ({ id: p.provider_id, name: p.provider_name, logo: p.logo_path }));
+  };
+  return {
+    link: region.link ?? null,
+    stream: list(region.flatrate),
+    free: list(region.free, region.ads),
+    rent: list(region.rent),
+    buy: list(region.buy),
+  };
+}
 
 async function tmdb<T>(path: string, params: Record<string, string | number | undefined> = {}, revalidate = 3600): Promise<T> {
   const url = new URL(API + path);
@@ -146,7 +168,7 @@ export function getTitle(media: MediaType, id: number): Promise<MovieDetail | nu
       let d: TmdbDetail;
       try {
         const credits = media === "tv" ? "aggregate_credits" : "credits";
-        d = await tmdb<TmdbDetail>(`/${media}/${id}`, { append_to_response: `${credits},videos,recommendations,similar` });
+        d = await tmdb<TmdbDetail>(`/${media}/${id}`, { append_to_response: `${credits},videos,recommendations,similar,watch/providers` });
       } catch (err) {
         if (err instanceof Error && err.message.endsWith(" 404")) return null;
         throw err;
@@ -175,6 +197,9 @@ export function getTitle(media: MediaType, id: number): Promise<MovieDetail | nu
         similar: related.filter(usable).slice(0, 12).map((m) => toMovie(m, media)),
         seasons,
         episodeCount: d.number_of_episodes ?? null,
+        watchProviders: Object.fromEntries(
+          Object.entries(d["watch/providers"]?.results ?? {}).map(([country, region]) => [country, toProviders(region)]),
+        ),
       };
     },
     () => fallbackDetail(media, id),

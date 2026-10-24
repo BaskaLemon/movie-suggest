@@ -46,16 +46,20 @@ function useActiveSection(enabled: boolean) {
   return enabled ? active : null;
 }
 
-export function SideRail() {
+// Which link matches where the visitor is: a page, or on the home page the section in view.
+function useIsCurrent() {
   const pathname = usePathname();
   const onHome = pathname === "/";
   const section = useActiveSection(onHome);
-
-  const isCurrent = (href: string) => {
+  return (href: string) => {
     if (href.startsWith("/#")) return onHome && section === href.slice(2);
     if (href === "/") return onHome && section === null;
     return pathname.startsWith(href);
   };
+}
+
+export function SideRail() {
+  const isCurrent = useIsCurrent();
 
   return (
     <nav aria-label="Quick links" className="fixed left-0 top-0 z-30 hidden h-dvh w-20 flex-col items-center justify-center lg:flex">
@@ -84,6 +88,37 @@ export function SideRail() {
           );
         })}
       </div>
+    </nav>
+  );
+}
+
+// Phones and tablets: the same links as the side rail, minus Search (it's in the header).
+const MOBILE_ITEMS = ITEMS.filter((i) => i.href !== "/search");
+
+export function MobileNav() {
+  const isCurrent = useIsCurrent();
+  return (
+    <nav
+      aria-label="Main"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-[#05071a]/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
+    >
+      <ul className="mx-auto flex max-w-lg justify-around">
+        {MOBILE_ITEMS.map(({ href, label, icon: Icon }) => {
+          const current = isCurrent(href);
+          return (
+            <li key={href} className="flex-1">
+              <Link
+                href={href}
+                aria-current={current ? "location" : undefined}
+                className={`flex h-16 flex-col items-center justify-center gap-1 text-[10px] font-medium transition ${current ? "text-accent" : "text-ink/60"}`}
+              >
+                <Icon size={21} strokeWidth={current ? 2.25 : 1.75} />
+                {label === "Pick for me" ? "Pick" : label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     </nav>
   );
 }

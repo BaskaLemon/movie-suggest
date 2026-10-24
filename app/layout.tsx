@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Bebas_Neue, Poppins } from "next/font/google";
 import { AmbientBackground } from "@/components/AmbientBackground";
 import { Header } from "@/components/Header";
-import { SideRail } from "@/components/SideRail";
+import { MobileNav, SideRail } from "@/components/SideRail";
 import { ViewerProvider, type ClientViewer } from "@/components/ViewerProvider";
 import { getViewer } from "@/lib/auth";
 import type { Profile } from "@/lib/db";
@@ -42,6 +43,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         profile: viewer.profile ? toClient(viewer.profile) : null,
         profiles: viewer.profiles.map(toClient),
         watchlist: viewer.watchlist,
+        watched: viewer.watched,
       }
     : null;
 
@@ -52,15 +54,19 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <ViewerProvider viewer={clientViewer}>
           <Header />
           <SideRail />
+          <MobileNav />
           <main className="lg:pl-20">{children}</main>
-          <footer className="mt-24 border-t border-line px-4 py-10 text-sm text-muted sm:px-8 lg:pl-28">
+          <footer className="mt-24 border-t border-line px-4 pb-28 pt-10 text-sm text-muted sm:px-8 lg:pb-10 lg:pl-28">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <p>
                 <span className="font-display text-lg tracking-wider text-ink">REELPICK</span> · Movie data from{" "}
                 <a className="underline decoration-line underline-offset-4 hover:text-ink" href="https://www.themoviedb.org/" target="_blank" rel="noreferrer">
                   TMDB
                 </a>
-                . This product uses the TMDB API but is not endorsed or certified by TMDB.
+                . This product uses the TMDB API but is not endorsed or certified by TMDB. ·{" "}
+                <Link href="/privacy" className="underline decoration-line underline-offset-4 hover:text-ink">
+                  Privacy
+                </Link>
               </p>
               {!hasTmdb && (
                 <p className="rounded-full border border-line px-3 py-1 text-xs">

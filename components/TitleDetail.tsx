@@ -7,8 +7,11 @@ import { MovieRow } from "@/components/MovieRow";
 import { Poster } from "@/components/Poster";
 import { RatingGauge } from "@/components/RatingGauge";
 import { Stars } from "@/components/Stars";
+import { WatchedButton } from "@/components/WatchedButton";
 import { WatchlistButton } from "@/components/WatchlistButton";
-import { getTitle } from "@/lib/catalog";
+import { WhereToWatch } from "@/components/WhereToWatch";
+import { getTitle, hasTmdb } from "@/lib/catalog";
+import { visitorCountry } from "@/lib/region";
 import { formatCount, formatRuntime, tmdbImage } from "@/lib/format";
 import { genreNames } from "@/lib/genres";
 import type { MediaType } from "@/lib/types";
@@ -34,6 +37,7 @@ export async function TitleDetail({ media, id }: { media: MediaType; id: string 
   const movie = await load(media, id);
   if (!movie) notFound();
   const tv = media === "tv";
+  const country = await visitorCountry();
 
   const genres = genreNames(movie.genreIds, 4);
   const runtime = formatRuntime(movie.runtime);
@@ -78,6 +82,7 @@ export async function TitleDetail({ media, id }: { media: MediaType; id: string 
                 <span className="inline-flex h-12 items-center justify-center rounded-full bg-white/10 text-xs text-muted">No trailer</span>
               )}
               <WatchlistButton movie={movie} compact className="px-3" />
+              <WatchedButton movie={movie} className="col-span-2 h-11" />
             </div>
           </div>
 
@@ -92,6 +97,7 @@ export async function TitleDetail({ media, id }: { media: MediaType; id: string 
               {genres.length > 0 && <span className="text-accent">{genres.join(" · ")}</span>}
             </div>
             <p className="mt-6 max-w-2xl text-[16px] leading-relaxed text-ink/90">{movie.overview || "No synopsis yet."}</p>
+            <WhereToWatch providers={movie.watchProviders[country]} country={country} demo={!hasTmdb} />
           </div>
         </div>
       </div>

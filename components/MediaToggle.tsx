@@ -34,10 +34,11 @@ export function MediaToggle<T extends PickMedia>({
             role="radio"
             aria-checked={on}
             onClick={() => onChange(id as T)}
-            className={`relative inline-flex h-9 items-center gap-2 rounded-full px-4 text-sm font-medium transition ${on ? "text-accent-ink" : "text-ink/75 hover:text-ink"}`}
+            className={`relative inline-flex h-9 items-center gap-2 rounded-full px-3 text-sm font-medium transition sm:px-4 ${on ? "text-accent-ink" : "text-ink/75 hover:text-ink"}`}
           >
             {on && <motion.span layoutId={`${layoutGroup}-pill`} className="absolute inset-0 rounded-full bg-accent" transition={{ type: "spring", stiffness: 400, damping: 32 }} />}
-            <Icon size={16} className="relative" />
+            {/* Icons drop on narrow phones so the switch fits beside the reset button. */}
+            <Icon size={16} className="relative hidden min-[400px]:block" />
             <span className="relative">{label}</span>
           </button>
         );

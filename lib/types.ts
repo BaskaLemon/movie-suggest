@@ -41,6 +41,19 @@ export type MovieDetail = Movie & {
   similar: Movie[];
   seasons: Season[];
   episodeCount: number | null;
+  // Where it streams, rents or sells, by ISO country code (from TMDB, data by JustWatch).
+  watchProviders: Record<string, WatchProviders>;
+};
+
+export type Provider = { id: number; name: string; logo: string | null };
+
+export type WatchProviders = {
+  // TMDB's watch page for the title in that country; it links out to each service.
+  link: string | null;
+  stream: Provider[];
+  free: Provider[];
+  rent: Provider[];
+  buy: Provider[];
 };
 
 export type ListKind = "trending" | "popular" | "recent" | "top";

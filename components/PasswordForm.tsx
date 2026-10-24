@@ -4,7 +4,8 @@ import { useActionState, useRef } from "react";
 import { Field, fieldClass, primaryButton } from "./AuthForm";
 import { changePassword, type FormState } from "@/app/actions/account";
 
-export function PasswordForm() {
+// Accounts created with Google have no password yet: they set one without a current password.
+export function PasswordForm({ hasPassword = true }: { hasPassword?: boolean }) {
   const form = useRef<HTMLFormElement>(null);
   const [state, action, pending] = useActionState<FormState, FormData>(async (prev, fd) => {
     const result = await changePassword(prev, fd);
@@ -14,9 +15,11 @@ export function PasswordForm() {
 
   return (
     <form ref={form} action={action} className="space-y-5">
-      <Field label="Current password">
-        <input name="current" type="password" required autoComplete="current-password" className={fieldClass} />
-      </Field>
+      {hasPassword && (
+        <Field label="Current password">
+          <input name="current" type="password" required autoComplete="current-password" className={fieldClass} />
+        </Field>
+      )}
       <Field label="New password">
         <input name="next" type="password" required minLength={8} autoComplete="new-password" className={fieldClass} placeholder="At least 8 characters" />
       </Field>
@@ -31,7 +34,7 @@ export function PasswordForm() {
         </p>
       )}
       <button type="submit" disabled={pending} className={primaryButton}>
-        {pending ? "Updating…" : "Update password"}
+        {pending ? "Saving…" : hasPassword ? "Update password" : "Set password"}
       </button>
     </form>
   );

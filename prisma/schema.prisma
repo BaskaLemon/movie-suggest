@@ -13,8 +13,10 @@ model User {
   passwordHash String
   salt         String
   createdAt    DateTime  @default(now())
-  profiles     Profile[]
-  sessions     Session[]
+  profiles      Profile[]
+  sessions      Session[]
+  oauthAccounts OAuthAccount[]
+  resetTokens   PasswordResetToken[]
 }
 
 model Profile {
@@ -27,6 +29,7 @@ model Profile {
   defaultMedia String          @default("all")
   createdAt    DateTime        @default(now())
   watchlist    WatchlistItem[]
+  watched      WatchedItem[]
   sessions     Session[]
 
   @@index([userId])
@@ -65,4 +68,59 @@ model WatchlistItem {
 
   @@unique([profileId, mediaType, tmdbId])
   @@index([profileId, addedAt])
+}
+
+// Titles a profile has already seen; the picker skips these.
+model WatchedItem {
+  id        Int      @id @default(autoincrement())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  mediaType String
+  tmdbId    Int
+  title     String
+  overview  String
+  year      Int?
+  rating    Float
+  voteCount Int
+  genreIds  String
+  poster    String?
+  backdrop  String?
+  addedAt   DateTime @default(now())
+
+  @@unique([profileId, mediaType, tmdbId])
+  @@index([profileId, addedAt])
+}
+
+// One row per counted event (failed sign-in, sign-up, reset request), keyed by
+// e.g. "signin:email:<address>" or "signup:ip:<address>". Old rows are pruned as new ones arrive.
+model RateLimitHit {
+  id        Int      @id @default(autoincrement())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+}
+
+model PasswordResetToken {
+  // sha256 of the emailed token; the token itself is never stored.
+  tokenHash String    @id
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  @@index([userId])
+}
+
+// Sign-in through an external provider. Accounts created this way have an empty
+// passwordHash until the person sets a password on the account page.
+model OAuthAccount {
+  provider          String
+  providerAccountId String
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+
+  @@id([provider, providerAccountId])
+  @@index([userId])
 }
